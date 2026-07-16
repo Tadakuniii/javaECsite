@@ -14,7 +14,7 @@ java {
 }
 
 springBoot {
-	mainClass = 'com.example.demo.WebShop'
+	mainClass = 'com.example.demo.ShopApplication'
 }
 
 
