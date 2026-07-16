@@ -13,6 +13,11 @@ java {
 	}
 }
 
+springBoot {
+	mainClass = 'com.example.demo.WebShop'
+}
+
+
 repositories {
 	mavenCentral()
 }
