@@ -251,3 +251,8 @@ p {
   opacity: 0;
   transform: translateY(-10px);
 }
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

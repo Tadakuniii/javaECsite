@@ -1,70 +1,35 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-
-const props = defineProps<{
-  initialDebugMode?: boolean
-}>()
+import { ref } from 'vue'
+import { getAuthenticatedCustomer, submitAuthenticationForm } from '../services/authenticationApi'
 
 const emit = defineEmits<{
-  (e: 'change-view', view: 'register' | 'login' | 'success' | 'register-success'): void
+  (e: 'change-view', view: 'register'): void
   (e: 'login-success', username: string): void
 }>()
-
 const userid = ref('')
 const password = ref('')
 const error = ref('')
-const isDebugMode = ref(props.initialDebugMode || false)
-
-watch(() => props.initialDebugMode, (newVal) => {
-  isDebugMode.value = newVal || false
-})
+const isSubmitting = ref(false)
 
 const handleLogin = async () => {
   error.value = ''
-  
+  if (!userid.value.trim() || !password.value) {
+    error.value = 'ユーザIDとパスワードを入力してください'
+    return
+  }
+  isSubmitting.value = true
   try {
-    const params = new URLSearchParams()
-    params.append('userid', userid.value)
-    params.append('password', password.value)
-
-    const response = await fetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params
-    })
-
-    if (!response.ok) {
-      throw new Error('サーバーエラーが発生しました')
-    }
-
-    const data = await response.json()
-
-    if (data.status === 'SUCCESS') {
-      emit('login-success', data.username)
-    } else if (data.status === 'EMPTY_ID') {
-      // IDが空の場合は新規登録画面へ
-      emit('change-view', 'register')
-    } else if (data.status === 'DEBUG_LOGIN') {
-      // デバッグモード：新規登録ボタンを隠してリロード
-      isDebugMode.value = true
-      userid.value = ''
-      password.value = ''
-      error.value = 'デバッグログイン：新規登録ボタンのないログイン画面に切り替えました。'
-    } else if (data.status === 'RELOGIN') {
-      error.value = data.message || 'ユーザーIDまたはパスワードが間違っています。'
-    } else {
-      error.value = '不明なエラーが発生しました。'
-    }
-  } catch (err: any) {
-    error.value = err.message || '通信エラーが発生しました。'
+    await submitAuthenticationForm('/api/login', { userid: userid.value, password: password.value })
+    const customer = await getAuthenticatedCustomer()
+    if (!customer?.username) throw new Error('ログイン状態を確認できませんでした')
+    emit('login-success', customer.username)
+  } catch (errorResponse: unknown) {
+    error.value = errorResponse instanceof Error ? errorResponse.message : '通信エラーが発生しました'
+  } finally {
+    isSubmitting.value = false
   }
 }
-
-const goToRegister = () => {
-  emit('change-view', 'register')
-}
+const goToRegister = () => emit('change-view', 'register')
 </script>
 
 <template>
@@ -76,7 +41,7 @@ const goToRegister = () => {
     <h1>Web ショップ販売 システム</h1>
     <h2>ログインしてください</h2>
 
-    <div v-if="error" :class="['alert', isDebugMode ? 'alert-success' : 'alert-danger']">
+    <div v-if="error" class="alert alert-danger">
       {{ error }}
     </div>
 
@@ -87,6 +52,7 @@ const goToRegister = () => {
           type="text"
           id="userid"
           v-model="userid"
+          autocomplete="username"
           class="input-control"
           placeholder="ユーザーIDを入力"
         />
@@ -98,20 +64,19 @@ const goToRegister = () => {
           type="password"
           id="password"
           v-model="password"
+          autocomplete="current-password"
           class="input-control"
           placeholder="パスワードを入力"
         />
       </div>
 
-      <button type="submit" class="btn">ログイン</button>
+      <button type="submit" class="btn" :disabled="isSubmitting">{{ isSubmitting ? 'ログイン中…' : 'ログイン' }}</button>
     </form>
 
-    <template v-if="!isDebugMode">
-      <div class="divider"></div>
-      <p class="text-center mb-4" style="font-size: 14px; font-weight: 500;">
-        新規登録の方はユーザID登録ボタンをクリックしてください
-      </p>
-      <button @click="goToRegister" class="btn btn-secondary">ユーザID登録</button>
-    </template>
+    <div class="divider"></div>
+    <p class="text-center mb-4" style="font-size: 14px; font-weight: 500;">
+      新規登録の方はユーザID登録ボタンをクリックしてください
+    </p>
+    <button type="button" @click="goToRegister" class="btn btn-secondary">ユーザID登録</button>
   </div>
 </template>
