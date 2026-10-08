@@ -1,14 +1,28 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import { submitAuthenticationForm } from '../services/authenticationApi'
+const error = ref('')
+const isSubmitting = ref(false)
 const props = defineProps<{
   username: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'change-view', view: 'register' | 'login' | 'success' | 'register-success'): void
+  (e: 'logout-success'): void
 }>()
 
-const handleLogout = () => {
-  emit('change-view', 'login')
+/** サーバーのセッションを破棄した後にログアウト完了を通知する。 */
+const handleLogout = async () => {
+  error.value = ''
+  isSubmitting.value = true
+  try {
+    await submitAuthenticationForm('/api/logout')
+    emit('logout-success')
+  } catch (errorResponse: unknown) {
+    error.value = errorResponse instanceof Error ? errorResponse.message : 'ログアウトに失敗しました'
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -27,7 +41,8 @@ const handleLogout = () => {
     <p class="mb-4">Web Shop にご来店ありがとうございます</p>
     
     <div class="divider"></div>
-    <button @click="handleLogout" class="btn">ログアウト</button>
+    <div v-if="error" class="alert alert-danger">{{ error }}</div>
+    <button @click="handleLogout" class="btn" :disabled="isSubmitting">{{ isSubmitting ? 'ログアウト中…' : 'ログアウト' }}</button>
   </div>
 </template>
 

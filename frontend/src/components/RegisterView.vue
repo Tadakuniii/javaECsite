@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { submitAuthenticationForm } from '../services/authenticationApi'
 
 const emit = defineEmits<{
   (e: 'change-view', view: 'register' | 'login' | 'success' | 'register-success'): void
@@ -10,7 +11,9 @@ const password1 = ref('')
 const password2 = ref('')
 const username = ref('')
 const error = ref('')
+const isSubmitting = ref(false)
 
+/** 会員情報を送信し、登録結果または入力エラーを表示する。 */
 const handleRegister = async () => {
   error.value = ''
 
@@ -20,26 +23,14 @@ const handleRegister = async () => {
     return
   }
 
+  isSubmitting.value = true
   try {
-    const params = new URLSearchParams()
-    params.append('userid', userid.value)
-    params.append('password1', password1.value)
-    params.append('password2', password2.value)
-    params.append('username', username.value)
-
-    const response = await fetch('/api/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params
+    const data = await submitAuthenticationForm('/api/register', {
+      userid: userid.value,
+      password1: password1.value,
+      password2: password2.value,
+      username: username.value,
     })
-
-    if (!response.ok) {
-      throw new Error('サーバーエラーが発生しました')
-    }
-
-    const data = await response.json()
 
     if (data.status === 'SUCCESS') {
       emit('change-view', 'register-success')
@@ -50,11 +41,14 @@ const handleRegister = async () => {
     } else {
       error.value = data.message || '登録に失敗しました。'
     }
-  } catch (err: any) {
-    error.value = err.message || '通信エラーが発生しました。'
+  } catch (err: unknown) {
+    error.value = err instanceof Error ? err.message : '通信エラーが発生しました。'
+  } finally {
+    isSubmitting.value = false
   }
 }
 
+/** ログイン画面への切り替えを親画面へ通知する。 */
 const goToLogin = () => {
   emit('change-view', 'login')
 }
@@ -77,9 +71,12 @@ const goToLogin = () => {
           id="userid"
           v-model="userid"
           class="input-control"
-          placeholder="ユーザーID"
+          placeholder="例：user-01_test"
+          autocomplete="username"
+          minlength="3" maxlength="64" pattern="[A-Za-z0-9_-]{3,64}"
           required
         />
+        <p class="input-hint">半角英数字・「-」・「_」で3〜64文字</p>
       </div>
 
       <div class="form-group">
@@ -88,8 +85,9 @@ const goToLogin = () => {
           type="password"
           id="password1"
           v-model="password1"
+          autocomplete="new-password" minlength="8" maxlength="72"
           class="input-control"
-          placeholder="パスワード"
+          placeholder="8文字以上で入力してください"
           required
         />
       </div>
@@ -100,6 +98,7 @@ const goToLogin = () => {
           type="password"
           id="password2"
           v-model="password2"
+          autocomplete="new-password" minlength="8" maxlength="72"
           class="input-control"
           placeholder="パスワードの確認"
           required
@@ -112,15 +111,23 @@ const goToLogin = () => {
           type="text"
           id="username"
           v-model="username"
+          autocomplete="name" maxlength="100"
           class="input-control"
           placeholder="例：山田 太郎"
         />
       </div>
 
-      <button type="submit" class="btn">登録</button>
+      <button type="submit" class="btn" :disabled="isSubmitting">{{ isSubmitting ? '登録中…' : '登録' }}</button>
     </form>
 
     <div class="divider"></div>
     <button @click="goToLogin" class="btn btn-secondary">ログイン画面に戻る</button>
   </div>
 </template>
+
+<style scoped>
+.input-hint {
+  margin-top: 6px;
+  font-size: 13px;
+}
+</style>

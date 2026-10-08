@@ -1,46 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
-const emit = defineEmits<{
-  (e: 'change-view-debug'): void
-  (e: 'change-view', view: 'login'): void
-}>()
-
-const error = ref('')
-
-const handleReturnToLogin = async () => {
-  try {
-    const params = new URLSearchParams()
-    params.append('userid', 'LOgIN0000')
-    params.append('password', '00000000')
-
-    const response = await fetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params
-    })
-
-    if (!response.ok) {
-      throw new Error('サーバーエラーが発生しました')
-    }
-
-    const data = await response.json()
-
-    if (data.status === 'DEBUG_LOGIN') {
-      emit('change-view-debug')
-    } else {
-      // 想定外の場合は通常のログイン画面へ
-      emit('change-view', 'login')
-    }
-  } catch (err: any) {
-    error.value = 'ログイン画面の切り替えに失敗しました。通常のログイン画面に戻ります。'
-    setTimeout(() => {
-      emit('change-view', 'login')
-    }, 2000)
-  }
-}
+const emit = defineEmits<{ (e: 'change-view', view: 'login'): void }>()
+/** 登録後に通常のログイン画面へ戻る。 */
+const handleReturnToLogin = () => emit('change-view', 'login')
 </script>
 
 <template>
@@ -54,13 +15,7 @@ const handleReturnToLogin = async () => {
     <h1>登録完了</h1>
     <h2 class="mt-4">ユーザIDが登録されました</h2>
     
-    <div v-if="error" class="alert alert-danger">
-      {{ error }}
-    </div>
-
-    <p class="mb-4" style="font-size: 14px; font-weight: 500;">
-      新規登録の方はユーザID登録ボタンをクリックしてください
-    </p>
+    <p class="mb-4">登録したユーザIDとパスワードでログインしてください</p>
 
     <div class="divider"></div>
     <button @click="handleReturnToLogin" class="btn">ログイン画面に戻る</button>
