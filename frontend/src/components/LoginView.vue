@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { getAuthenticatedCustomer, submitAuthenticationForm } from '../services/authenticationApi'
+import { loginCustomer } from '../services/authenticationApi'
 
 const emit = defineEmits<{
   (e: 'change-view', view: 'register'): void
@@ -11,6 +11,7 @@ const password = ref('')
 const error = ref('')
 const isSubmitting = ref(false)
 
+/** 入力を確認してログインし、成功した表示名を親画面へ通知する。 */
 const handleLogin = async () => {
   error.value = ''
   if (!userid.value.trim() || !password.value) {
@@ -19,16 +20,15 @@ const handleLogin = async () => {
   }
   isSubmitting.value = true
   try {
-    await submitAuthenticationForm('/api/login', { userid: userid.value, password: password.value })
-    const customer = await getAuthenticatedCustomer()
-    if (!customer?.username) throw new Error('ログイン状態を確認できませんでした')
-    emit('login-success', customer.username)
+    const displayName = await loginCustomer(userid.value, password.value)
+    emit('login-success', displayName)
   } catch (errorResponse: unknown) {
     error.value = errorResponse instanceof Error ? errorResponse.message : '通信エラーが発生しました'
   } finally {
     isSubmitting.value = false
   }
 }
+/** 新規登録画面への切り替えを親画面へ通知する。 */
 const goToRegister = () => emit('change-view', 'register')
 </script>
 

@@ -29,9 +29,11 @@ class AuthenticationIntegrationTests {
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired CustomerAccountInitializer accountInitializer;
 
+    /** 各テストを独立させるためH2の顧客データを消去する。 */
     @BeforeEach
     void clearTestCustomers() { customers.deleteAll(); }
 
+    /** パスワードのハッシュ化と重複登録時の既存データ保護を検証する。 */
     @Test
     void registrationStoresHashedPasswordAndRejectsDuplicateId() throws Exception {
         registerCustomer();
@@ -45,6 +47,7 @@ class AuthenticationIntegrationTests {
         assertThat(customers.findById("test-user").orElseThrow().getCustomerPassword()).isEqualTo(storedPassword);
     }
 
+    /** ログイン応答、セッションID更新、状態保持、ログアウト後のアクセス拒否を検証する。 */
     @Test
     void loginPersistsSessionRotatesSessionIdAndLogoutRevokesAccess() throws Exception {
         registerCustomer();
@@ -53,7 +56,7 @@ class AuthenticationIntegrationTests {
         String originalSessionId = session.getId();
         api.perform(post("/api/login").session(session).with(csrf())
                 .param("userid", "test-user").param("password", "password123"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.username").value("テスト利用者"));
         assertThat(session.getId()).isNotEqualTo(originalSessionId);
         for (int request = 0; request < 2; request++) {
             api.perform(get("/api/session").session(session)).andExpect(status().isOk())
@@ -65,6 +68,7 @@ class AuthenticationIntegrationTests {
         api.perform(get("/api/session")).andExpect(status().isUnauthorized());
     }
 
+    /** 実際のCSRFトークンを使ってフォームを送信できることを検証する。 */
     @Test
     void csrfTokenEndpointWorksWithDefaultMaskedTokenProtection() throws Exception {
         MvcResult result = api.perform(get("/api/csrf")).andReturn();
@@ -77,11 +81,31 @@ class AuthenticationIntegrationTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUCCESS"));
     }
 
+    /** 引用符や改行を含む表示名も正しいJSONで返すことを検証する。 */
+    @Test
+    void loginResponseSafelySerializesDisplayName() throws Exception {
+        String displayName = "利用者\"\\\n名前";
+        customers.saveAndFlush(new Customer("quoted-user", passwordEncoder.encode("password123"), displayName));
+        api.perform(post("/api/login").with(csrf()).param("userid", "quoted-user")
+                .param("password", "password123"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.username").value(displayName));
+    }
+
+    /** 必須項目が未送信でも400の入力エラーを返すことを検証する。 */
+    @Test
+    void missingRegistrationFieldsReturnValidationError() throws Exception {
+        api.perform(post("/api/register").with(csrf()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value("VALIDATION_ERROR"));
+        assertThat(customers.count()).isZero();
+    }
+
+    /** 未ログインのセッション確認を拒否することを検証する。 */
     @Test
     void anonymousRequestsCannotReadCustomerSession() throws Exception {
         api.perform(get("/api/session")).andExpect(status().isUnauthorized());
     }
 
+    /** 誤ったパスワードと旧デバッグIDで認証できないことを検証する。 */
     @Test
     void wrongPasswordAndRemovedDebugIdCannotAuthenticate() throws Exception {
         registerCustomer();
@@ -91,6 +115,7 @@ class AuthenticationIntegrationTests {
                 .andExpect(status().isUnauthorized());
     }
 
+    /** 状態を変更する各APIがCSRFトークンなしの要求を拒否することを検証する。 */
     @Test
     void mutationRequestsRequireCsrfToken() throws Exception {
         api.perform(post("/api/register").param("userid", "test-user").param("password1", "password123")
@@ -101,6 +126,7 @@ class AuthenticationIntegrationTests {
         assertThat(customers.count()).isZero();
     }
 
+    /** 空欄、不正なID、短いパスワードをサーバー側で拒否することを検証する。 */
     @Test
     void registrationRejectsBlankInvalidAndShortInputs() throws Exception {
         for (String userId : new String[]{"", "ab", "bad id"}) {
@@ -114,6 +140,7 @@ class AuthenticationIntegrationTests {
         assertThat(customers.count()).isZero();
     }
 
+    /** 確認用パスワードの不一致とBCryptのバイト数制限を検証する。 */
     @Test
     void registrationRejectsMismatchedAndOversizedUtf8Passwords() throws Exception {
         api.perform(post("/api/register").with(csrf()).param("userid", "test-user")
@@ -126,6 +153,7 @@ class AuthenticationIntegrationTests {
         assertThat(customers.count()).isZero();
     }
 
+    /** 平文からの移行後も認証でき、繰り返し起動で再ハッシュ化しないことを検証する。 */
     @Test
     void migrationPreservesExistingPasswordAndDoesNotHashTwice() throws Exception {
         customers.saveAndFlush(new Customer("legacy-user", "oldpass", "既存利用者"));
@@ -138,6 +166,7 @@ class AuthenticationIntegrationTests {
                 .andExpect(status().isOk());
     }
 
+    /** 各認証テストで共通の顧客を登録する。 */
     private void registerCustomer() throws Exception {
         api.perform(post("/api/register").with(csrf()).param("userid", "test-user")
                 .param("password1", "password123").param("password2", "password123")

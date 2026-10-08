@@ -11,6 +11,7 @@ const emit = defineEmits<{
   (e: 'logout-success'): void
 }>()
 
+/** サーバーのセッションを破棄した後にログアウト完了を通知する。 */
 const handleLogout = async () => {
   error.value = ''
   isSubmitting.value = true

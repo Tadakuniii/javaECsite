@@ -12,6 +12,7 @@ const currentView = ref<ViewState>('login')
 const loggedInUser = ref('')
 const isRestoringSession = ref(true)
 const sessionError = ref('')
+/** 指定された認証画面へ切り替える。 */
 const changeView = (view: ViewState) => {
   currentView.value = view
 }
@@ -27,11 +28,13 @@ onMounted(async () => {
   }
 })
 
+/** ログイン中の表示名を保存し、成功画面を表示する。 */
 const onLoginSuccess = (username: string) => {
   loggedInUser.value = username
   currentView.value = 'success'
 }
 
+/** 画面上のログイン情報を消去し、ログイン画面へ戻る。 */
 const onLogoutSuccess = () => {
   loggedInUser.value = ''
   currentView.value = 'login'

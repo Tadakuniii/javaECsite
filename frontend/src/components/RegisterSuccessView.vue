@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const emit = defineEmits<{ (e: 'change-view', view: 'login'): void }>()
+/** 登録後に通常のログイン画面へ戻る。 */
 const handleReturnToLogin = () => emit('change-view', 'login')
 </script>
 

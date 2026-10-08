@@ -13,6 +13,7 @@ const username = ref('')
 const error = ref('')
 const isSubmitting = ref(false)
 
+/** 会員情報を送信し、登録結果または入力エラーを表示する。 */
 const handleRegister = async () => {
   error.value = ''
 
@@ -47,6 +48,7 @@ const handleRegister = async () => {
   }
 }
 
+/** ログイン画面への切り替えを親画面へ通知する。 */
 const goToLogin = () => {
   emit('change-view', 'login')
 }

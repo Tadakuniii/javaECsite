@@ -1,6 +1,8 @@
 package com.example.demo;
 
 import jakarta.persistence.EntityManager;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,15 +14,21 @@ public class CustomerRegistrationService {
     private final CustomerRepository customers;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
+    private final Validator registrationValidator;
 
-    public CustomerRegistrationService(CustomerRepository customers, PasswordEncoder passwordEncoder, EntityManager entityManager) {
+    /** 顧客保存、パスワード保護、入力検証の依存を受け取る。 */
+    public CustomerRegistrationService(CustomerRepository customers, PasswordEncoder passwordEncoder, EntityManager entityManager, Validator registrationValidator) {
         this.customers = customers;
         this.passwordEncoder = passwordEncoder;
         this.entityManager = entityManager;
+        this.registrationValidator = registrationValidator;
     }
 
+    /** 入力と重複を検証し、ハッシュ化したパスワードで顧客を登録する。 */
     @Transactional
-    public Map<String, String> registerCustomer(RegistrationRequest registration) {
+    public Map<String, Object> registerCustomer(RegistrationRequest registration) {
+        var violations = registrationValidator.validate(registration);
+        if (!violations.isEmpty()) throw new ConstraintViolationException(violations);
         if (!registration.password1().equals(registration.password2())) {
             return Map.of("status", "PASSWORD_MISMATCH", "message", "異なるパスワードが入力されました");
         }

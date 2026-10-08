@@ -12,11 +12,13 @@ public class CustomerAccountInitializer implements CommandLineRunner {
     private final CustomerRepository customers;
     private final PasswordEncoder passwordEncoder;
 
+    /** 初期顧客の保存と既存パスワードの移行に必要な依存を受け取る。 */
     public CustomerAccountInitializer(CustomerRepository customers, PasswordEncoder passwordEncoder) {
         this.customers = customers;
         this.passwordEncoder = passwordEncoder;
     }
 
+    /** 起動時に初期顧客を取り込み、既存の平文パスワードを移行する。 */
     @Override
     @Transactional
     public void run(String... args) throws Exception {
@@ -24,6 +26,7 @@ public class CustomerAccountInitializer implements CommandLineRunner {
         hashLegacyCustomerPasswords();
     }
 
+    /** DBが空の場合だけ、学習用ファイルから顧客をハッシュ化して登録する。 */
     private void importInitialCustomersIfDatabaseIsEmpty() throws java.io.IOException {
         Path initialCustomersFile = Path.of("src/main/java/com/example/demo/useridInfo.txt");
         if (customers.count() != 0 || !Files.isReadable(initialCustomersFile)) return;
@@ -38,6 +41,7 @@ public class CustomerAccountInitializer implements CommandLineRunner {
         }
     }
 
+    /** 既存アカウントのパスワードを一度だけハッシュ化する。 */
     private void hashLegacyCustomerPasswords() {
         // Preserve existing credentials and avoid hashing migrated passwords again.
         for (Customer customer : customers.findAll()) {
