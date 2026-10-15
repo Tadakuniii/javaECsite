@@ -24,13 +24,14 @@ export async function getAvailableProducts(): Promise<HealthProduct[]> {
       ? 'ログイン状態を確認できませんでした'
       : '商品情報を取得できませんでした')
   }
+  let body: { status?: string; products?: HealthProduct[] }
   try {
-    const body = await response.json() as { status?: string; products?: HealthProduct[] }
-    if (body.status !== 'SUCCESS' || !Array.isArray(body.products)) {
-      throw new Error('商品情報の形式を確認できませんでした')
-    }
-    return body.products
+    body = await response.json() as { status?: string; products?: HealthProduct[] }
   } catch {
     throw new Error('商品情報の形式を確認できませんでした')
   }
+  if (body.status !== 'SUCCESS' || !Array.isArray(body.products)) {
+    throw new Error('商品情報の形式を確認できませんでした')
+  }
+  return body.products
 }

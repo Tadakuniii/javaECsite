@@ -40,16 +40,15 @@ public class CustomerAccountInitializer implements CommandLineRunner {
     /** 環境変数で指定された資格情報から唯一の管理者を作成または更新する。 */
     private void provisionAdministrator() {
         boolean configurationIsComplete = !administratorUserId.isBlank() && !administratorPassword.isBlank();
+        if (!configurationIsComplete) return;
+
         for (Customer customer : customers.findAll()) {
-            boolean shouldBeAdministrator = configurationIsComplete
-                    && customer.getCustomerId().equals(administratorUserId);
+            boolean shouldBeAdministrator = customer.getCustomerId().equals(administratorUserId);
             if (customer.isAdministrator() != shouldBeAdministrator) {
                 customer.setAdministrator(shouldBeAdministrator);
                 customers.save(customer);
             }
         }
-        if (!configurationIsComplete) return;
-
         Customer administrator = customers.findById(administratorUserId)
                 .orElseGet(() -> new Customer(administratorUserId,
                         passwordEncoder.encode(administratorPassword), "ショップ管理者"));
@@ -79,8 +78,8 @@ public class CustomerAccountInitializer implements CommandLineRunner {
         for (Customer customer : customers.findAll()) {
             if (!customer.getCustomerPassword().startsWith("{bcrypt}")) {
                 customer.setCustomerPassword(passwordEncoder.encode(customer.getCustomerPassword()));
+                customers.save(customer);
             }
-            customers.save(customer);
         }
     }
 }

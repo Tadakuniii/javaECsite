@@ -75,6 +75,19 @@ class AuthenticationIntegrationTests {
         assertThat(customers.findById("former-admin").orElseThrow().isAdministrator()).isFalse();
     }
 
+    /** 管理者設定が不足している起動では、既存の管理者権限を維持することを検証する。 */
+    @Test
+    void incompleteAdministratorConfigurationKeepsExistingRole() throws Exception {
+        Customer existingAdministrator = new Customer(
+                "existing-admin", passwordEncoder.encode("existing-password"), "既存管理者");
+        existingAdministrator.setAdministrator(true);
+        customers.saveAndFlush(existingAdministrator);
+
+        new CustomerAccountInitializer(customers, passwordEncoder, "", "", false).run();
+
+        assertThat(customers.findById("existing-admin").orElseThrow().isAdministrator()).isTrue();
+    }
+
     /** ログイン応答、セッションID更新、状態保持、ログアウト後のアクセス拒否を検証する。 */
     @Test
     void loginPersistsSessionRotatesSessionIdAndLogoutRevokesAccess() throws Exception {
