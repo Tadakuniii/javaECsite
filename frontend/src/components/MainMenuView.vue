@@ -156,7 +156,8 @@ const handleLogout = async () => {
       <div v-if="selectedProduct" class="dialog-content">
         <button type="button" class="dialog-close" aria-label="商品詳細を閉じる" autofocus @click="closeProductDetails">×</button>
         <div class="detail-art" :style="{ '--product-accent': selectedProduct.accentColor }">
-          <ProductIllustration :kind="selectedProduct.illustration" :label="selectedProduct.label" :accent-color="selectedProduct.accentColor" />
+          <img v-if="selectedProduct.imageUrl" :src="selectedProduct.imageUrl" :alt="selectedProduct.name" class="product-image" />
+          <ProductIllustration v-else :kind="selectedProduct.illustration" :label="selectedProduct.label" :accent-color="selectedProduct.accentColor" />
         </div>
         <span class="product-category">{{ selectedProduct.category }}</span>
         <h2 id="product-detail-title">{{ selectedProduct.name }}</h2>
