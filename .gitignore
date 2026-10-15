@@ -1,5 +1,7 @@
 HELP.md
 .gradle
+# Local Gradle settings (machine-specific JDK paths)
+/backend/gradle.properties
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
