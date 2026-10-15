@@ -62,7 +62,6 @@ body {
 #app {
   width: 100%;
   max-width: 1120px;
-  perspective: 1000px;
 }
 
 /* Glassmorphism Card Style */
