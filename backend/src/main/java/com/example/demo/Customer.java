@@ -26,7 +26,8 @@ public class Customer {
     private String email;
     @Column(nullable = false)
     private boolean administrator = false;
-    @Column(nullable = false, updatable = false)
+    // 既存行を補完してからCustomerCreatedAtMigrationがDBのNOT NULL制約を適用する。
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     public Customer() {}

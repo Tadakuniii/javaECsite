@@ -1,10 +1,13 @@
 package com.example.demo;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,17 +39,28 @@ class ProductCatalogIntegrationTests {
     @Autowired OrderItemRepository orderItems;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired ProductCatalogInitializer catalogInitializer;
+    @Autowired JdbcTemplate database;
+    @PersistenceContext EntityManager entityManager;
 
     /** 初期カテゴリーと商品が一度だけ登録されることを検証する。 */
     @Test
+    @Transactional
     void initialCatalogContainsSixProductsAndIsIdempotent() throws Exception {
         assertThat(categories.count()).isEqualTo(3);
         assertThat(products.count()).isEqualTo(6);
+
+        Product existingProduct = products.findAllByActiveTrueOrderById().getFirst();
+        existingProduct.setName("カスタム商品名");
+        existingProduct.setPrice(9999);
+        products.saveAndFlush(existingProduct);
 
         catalogInitializer.run();
 
         assertThat(categories.count()).isEqualTo(3);
         assertThat(products.count()).isEqualTo(6);
+        Product reloadedProduct = products.findById(existingProduct.getId()).orElseThrow();
+        assertThat(reloadedProduct.getName()).isEqualTo("カスタム商品名");
+        assertThat(reloadedProduct.getPrice()).isEqualTo(9999);
         assertThat(products.findAllByActiveTrueOrderById())
                 .allSatisfy(product -> {
                     assertThat(product.getPrice()).isGreaterThanOrEqualTo(0);
@@ -61,9 +75,24 @@ class ProductCatalogIntegrationTests {
         api.perform(get("/api/products")).andExpect(status().isUnauthorized());
         api.perform(get("/api/products").with(user("catalog-test")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(6))
-                .andExpect(jsonPath("$[0].productCode").value("vitamin-c"))
-                .andExpect(jsonPath("$[0].category").value("サプリメント"));
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.products.length()").value(6))
+                .andExpect(jsonPath("$.products[0].productCode").value("vitamin-c"))
+                .andExpect(jsonPath("$.products[0].category").value("サプリメント"));
+    }
+
+    /** 顧客作成日時の移行後にNULL値がなく、DB制約も有効なことを検証する。 */
+    @Test
+    void customerCreatedAtMigrationBackfillsValuesBeforeEnforcingConstraint() {
+        Integer missingTimestamps = database.queryForObject(
+                "SELECT COUNT(*) FROM customers WHERE created_at IS NULL", Integer.class);
+        String nullable = database.queryForObject("""
+                SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'CUSTOMERS' AND COLUMN_NAME = 'CREATED_AT'
+                """, String.class);
+
+        assertThat(missingTimestamps).isZero();
+        assertThat(nullable).isEqualTo("NO");
     }
 
     /** 商品管理APIが管理者だけに登録・更新を許可することを検証する。 */
@@ -119,6 +148,8 @@ class ProductCatalogIntegrationTests {
         product.setName("変更後の商品名");
         product.setPrice(product.getPrice() + 500);
         products.save(product);
+        entityManager.flush();
+        entityManager.detach(orderItem);
 
         assertThat(orderItems.findAllByOrderId(order.getId()).getFirst())
                 .extracting(OrderItem::getProductName, OrderItem::getUnitPrice, OrderItem::getQuantity)
