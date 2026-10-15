@@ -16,6 +16,7 @@ const productLoadingError = ref('')
 const isLoadingProducts = ref(true)
 const searchQuery = ref('')
 const selectedProduct = ref<HealthProduct | null>(null)
+const failedProductImageIds = ref<Set<number>>(new Set())
 const productDialog = ref<HTMLDialogElement | null>(null)
 const logoutError = ref('')
 const isLoggingOut = ref(false)
@@ -49,6 +50,11 @@ const openProductDetails = async (product: HealthProduct) => {
 
 /** 商品情報を閉じ、元の商品ボタンへフォーカスを戻す。 */
 const closeProductDetails = () => { productDialog.value?.close() }
+
+/** 読み込めない商品画像を記録し、代替イラストへ切り替える。 */
+const handleProductImageError = (productId: number) => {
+  failedProductImageIds.value = new Set([...failedProductImageIds.value, productId])
+}
 
 /** 検索語とカテゴリの絞り込みを解除する。 */
 const resetProductFilters = () => {
@@ -128,7 +134,9 @@ const handleLogout = async () => {
       <div v-if="visibleProducts.length" class="product-grid">
         <article v-for="product in visibleProducts" :key="product.productCode" class="product-card card">
           <div class="product-art" :style="{ '--product-accent': product.accentColor }">
-            <img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name" class="product-image" />
+            <img v-if="product.imageUrl && !failedProductImageIds.has(product.id)"
+              :src="product.imageUrl" :alt="product.name" class="product-image"
+              @error="handleProductImageError(product.id)" />
             <ProductIllustration v-else :kind="product.illustration" :label="product.label" :accent-color="product.accentColor" />
           </div>
           <div class="product-content">
@@ -156,7 +164,9 @@ const handleLogout = async () => {
       <div v-if="selectedProduct" class="dialog-content">
         <button type="button" class="dialog-close" aria-label="商品詳細を閉じる" autofocus @click="closeProductDetails">×</button>
         <div class="detail-art" :style="{ '--product-accent': selectedProduct.accentColor }">
-          <img v-if="selectedProduct.imageUrl" :src="selectedProduct.imageUrl" :alt="selectedProduct.name" class="product-image" />
+          <img v-if="selectedProduct.imageUrl && !failedProductImageIds.has(selectedProduct.id)"
+            :src="selectedProduct.imageUrl" :alt="selectedProduct.name" class="product-image"
+            @error="handleProductImageError(selectedProduct.id)" />
           <ProductIllustration v-else :kind="selectedProduct.illustration" :label="selectedProduct.label" :accent-color="selectedProduct.accentColor" />
         </div>
         <span class="product-category">{{ selectedProduct.category }}</span>
