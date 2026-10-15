@@ -3,10 +3,10 @@ import { onMounted, ref } from 'vue'
 import { getAuthenticatedCustomer } from './services/authenticationApi'
 import LoginView from './components/LoginView.vue'
 import RegisterView from './components/RegisterView.vue'
-import SuccessView from './components/SuccessView.vue'
+import MainMenuView from './components/MainMenuView.vue'
 import RegisterSuccessView from './components/RegisterSuccessView.vue'
 
-type ViewState = 'login' | 'register' | 'success' | 'register-success'
+type ViewState = 'login' | 'register' | 'main-menu' | 'register-success'
 
 const currentView = ref<ViewState>('login')
 const loggedInUser = ref('')
@@ -28,10 +28,10 @@ onMounted(async () => {
   }
 })
 
-/** ログイン中の表示名を保存し、成功画面を表示する。 */
+/** ログイン中の表示名を保存し、メインメニューを表示する。 */
 const onLoginSuccess = (username: string) => {
   loggedInUser.value = username
-  currentView.value = 'success'
+  currentView.value = 'main-menu'
 }
 
 /** 画面上のログイン情報を消去し、ログイン画面へ戻る。 */
@@ -42,7 +42,7 @@ const onLogoutSuccess = () => {
 </script>
 
 <template>
-  <main id="app-container">
+  <main id="app-container" :class="{ 'main-menu-layout': currentView === 'main-menu' }">
     <p v-if="isRestoringSession" role="status">ログイン状態を確認中…</p>
     <template v-else>
       <div v-if="sessionError" class="alert alert-danger">{{ sessionError }}</div>
@@ -56,8 +56,8 @@ const onLogoutSuccess = () => {
           v-else-if="currentView === 'register'"
           @change-view="changeView"
         />
-        <SuccessView
-          v-else-if="currentView === 'success'"
+        <MainMenuView
+          v-else-if="currentView === 'main-menu'"
           :username="loggedInUser"
           @logout-success="onLogoutSuccess"
         />
@@ -77,6 +77,13 @@ const onLogoutSuccess = () => {
   justify-content: center;
   align-items: center;
   width: 100%;
-  min-height: 100vh;
+  max-width: 440px;
+  margin: 0 auto;
+  min-height: calc(100dvh - 40px);
+}
+
+#app-container.main-menu-layout {
+  max-width: 1120px;
+  justify-content: flex-start;
 }
 </style>
