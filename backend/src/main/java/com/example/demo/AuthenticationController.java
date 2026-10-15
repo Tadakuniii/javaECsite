@@ -35,7 +35,8 @@ public class AuthenticationController {
     @GetMapping("/api/session")
     public Map<String, Object> getAuthenticatedCustomer(Principal principal) {
         Customer customer = customers.findById(principal.getName()).orElseThrow();
-        return Map.of("status", "SUCCESS", "username", customer.getCustomerName());
+        return Map.of("status", "SUCCESS", "username", customer.getCustomerName(),
+                "administrator", customer.isAdministrator());
     }
 
     /** フォームの各項目を受け取り、検証を含む会員登録を実行する。 */

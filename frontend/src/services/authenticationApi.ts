@@ -2,6 +2,7 @@ export interface AuthenticationResponse {
   status: string
   message?: string
   username?: string
+  administrator?: boolean
 }
 
 /** APIのJSON応答を読み取り、HTMLや空のエラー応答には日本語の案内を返す。 */
@@ -49,11 +50,11 @@ export async function getAuthenticatedCustomer(): Promise<AuthenticationResponse
  * ログインして表示名を返す。セッション確認の通信失敗時だけログイン応答を利用する。
  * セッション確認が401を返した場合は、ログイン成功として扱わない。
  */
-export async function loginCustomer(userId: string, password: string): Promise<string> {
+export async function loginCustomer(userId: string, password: string): Promise<Required<Pick<AuthenticationResponse, 'username'>> & AuthenticationResponse> {
   const loginResponse = await submitAuthenticationForm('/api/login', { userid: userId, password })
   const customer = await getAuthenticatedCustomer().catch(() => undefined)
   if (customer === null) throw new Error('ログイン状態を確認できませんでした')
   const displayName = customer === undefined ? loginResponse.username : customer.username
   if (!displayName) throw new Error('ログイン状態を確認できませんでした')
-  return displayName
+  return { ...loginResponse, ...customer, username: displayName }
 }

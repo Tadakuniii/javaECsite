@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import ShopIcon from './ShopIcon.vue'
 
-defineProps<{ username: string; count: number; isCart: boolean; isLoggingOut: boolean }>()
-defineEmits<{ logout: [] }>()
+defineProps<{ username: string; administrator: boolean; count: number; isCart: boolean; isLoggingOut: boolean }>()
+defineEmits<{ logout: []; 'open-product-management': [] }>()
 </script>
 
 <template>
@@ -15,6 +15,7 @@ defineEmits<{ logout: [] }>()
       <nav class="header-actions" aria-label="ショップメニュー">
         <a class="catalog-link" href="#product-list" :aria-current="!isCart ? 'page' : undefined">商品一覧</a>
         <span class="welcome-message"><span>ようこそ</span><strong>{{ username }} 様</strong></span>
+        <button v-if="administrator" type="button" class="logout-button" @click="$emit('open-product-management')">商品管理</button>
         <button type="button" class="logout-button" :disabled="isLoggingOut" @click="$emit('logout')">{{ isLoggingOut ? 'ログアウト中…' : 'ログアウト' }}</button>
         <a class="cart-link" :class="{ active: isCart }" href="#cart" :aria-current="isCart ? 'page' : undefined" :aria-label="`カート、${count}点の商品`">
           <span class="cart-icon"><ShopIcon name="cart" /><span class="cart-badge">{{ count > 99 ? '99+' : count }}</span></span>
