@@ -50,17 +50,17 @@ test('成功応答でも壊れたJSONの解析エラーを画面へ出さない'
 
 test('セッション確認に成功した場合はその表示名を使う', async () => {
   mockLoginAndSession(jsonResponse({ status: 'SUCCESS', username: 'セッションの名前' }))
-  assert.equal(await loginCustomer('test-user', 'password123'), 'セッションの名前')
+  assert.equal((await loginCustomer('test-user', 'password123')).username, 'セッションの名前')
 })
 
 test('セッション確認の通信失敗時だけログイン応答を使う', async () => {
   mockLoginAndSession(new TypeError('Network unavailable'))
-  assert.equal(await loginCustomer('test-user', 'password123'), 'ログイン応答の名前')
+  assert.equal((await loginCustomer('test-user', 'password123')).username, 'ログイン応答の名前')
 })
 
 test('セッション確認が502の場合もログイン応答を利用できる', async () => {
   mockLoginAndSession(new Response('<html>Bad Gateway</html>', { status: 502 }))
-  assert.equal(await loginCustomer('test-user', 'password123'), 'ログイン応答の名前')
+  assert.equal((await loginCustomer('test-user', 'password123')).username, 'ログイン応答の名前')
 })
 
 test('セッション確認が401ならログイン応答へフォールバックしない', async () => {

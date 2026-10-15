@@ -26,7 +26,9 @@ public class AuthenticationSecurityConfiguration {
     UserDetailsService customerUserDetailsService(CustomerRepository customers) {
         return userId -> customers.findById(userId)
                 .map(customer -> User.withUsername(customer.getCustomerId())
-                        .password(customer.getCustomerPassword()).roles("CUSTOMER").build())
+                        .password(customer.getCustomerPassword())
+                        .roles(customer.isAdministrator() ? new String[]{"CUSTOMER", "ADMIN"} : new String[]{"CUSTOMER"})
+                        .build())
                 .orElseThrow(() -> new UsernameNotFoundException("ユーザーが見つかりません"));
     }
 
@@ -36,12 +38,14 @@ public class AuthenticationSecurityConfiguration {
         http.authorizeHttpRequests(access -> access
                 .requestMatchers("/api/csrf", "/api/login", "/api/register",
                         "/api/registid", "/api/RegistUserID", "/api/webshop", "/error").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .formLogin(login -> login.loginProcessingUrl("/api/login").usernameParameter("userid")
                 .successHandler((request, response, authentication) -> {
                     Customer customer = customers.findById(authentication.getName()).orElseThrow();
                     writeJson(response, 200, jsonMapper.writeValueAsString(
-                            Map.of("status", "SUCCESS", "username", customer.getCustomerName())));
+                            Map.of("status", "SUCCESS", "username", customer.getCustomerName(),
+                                    "administrator", customer.isAdministrator())));
                 })
                 .failureHandler((request, response, exception) -> writeJson(response, 401,
                         "{\"status\":\"RELOGIN\",\"message\":\"ユーザIDまたはパスワードが間違っています\"}")))

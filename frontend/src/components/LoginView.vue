@@ -4,7 +4,7 @@ import { loginCustomer } from '../services/authenticationApi'
 
 const emit = defineEmits<{
   (e: 'change-view', view: 'register'): void
-  (e: 'login-success', username: string): void
+  (e: 'login-success', username: string, administrator: boolean): void
 }>()
 const userid = ref('')
 const password = ref('')
@@ -20,8 +20,8 @@ const handleLogin = async () => {
   }
   isSubmitting.value = true
   try {
-    const displayName = await loginCustomer(userid.value, password.value)
-    emit('login-success', displayName)
+    const customer = await loginCustomer(userid.value, password.value)
+    emit('login-success', customer.username, customer.administrator === true)
   } catch (errorResponse: unknown) {
     error.value = errorResponse instanceof Error ? errorResponse.message : '通信エラーが発生しました'
   } finally {

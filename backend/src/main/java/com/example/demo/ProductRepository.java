@@ -5,5 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findAllByActiveTrueOrderById();
+    List<Product> findAllByOrderById();
     boolean existsByProductCode(String productCode);
 }

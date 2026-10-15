@@ -24,6 +24,8 @@ public class Customer {
     private String customerName;
     @Column(unique = true, length = 255)
     private String email;
+    @Column(nullable = false)
+    private boolean administrator = false;
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

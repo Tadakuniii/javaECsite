@@ -4,8 +4,11 @@ import { submitAuthenticationForm } from '../services/authenticationApi'
 import { getAvailableProducts, type HealthProduct, type ProductCategory } from '../services/productApi'
 import ProductIllustration from './ProductIllustration.vue'
 
-defineProps<{ username: string }>()
-const emit = defineEmits<{ (e: 'logout-success'): void }>()
+defineProps<{ username: string; administrator: boolean }>()
+const emit = defineEmits<{
+  (e: 'logout-success'): void
+  (e: 'open-product-management'): void
+}>()
 const categories: ('すべて' | ProductCategory)[] = ['すべて', 'サプリメント', '食品・飲料', '健康グッズ']
 const selectedCategory = ref<(typeof categories)[number]>('すべて')
 const products = ref<HealthProduct[]>([])
@@ -77,6 +80,9 @@ const handleLogout = async () => {
       </div>
       <div class="account-menu">
         <p class="welcome-message">ようこそ、<strong>{{ username }}</strong> 様</p>
+        <button v-if="administrator" type="button" class="logout-button" @click="emit('open-product-management')">
+          商品管理
+        </button>
         <button type="button" class="logout-button" :disabled="isLoggingOut" @click="handleLogout">
           {{ isLoggingOut ? 'ログアウト中…' : 'ログアウト' }}
         </button>
@@ -122,7 +128,8 @@ const handleLogout = async () => {
       <div v-if="visibleProducts.length" class="product-grid">
         <article v-for="product in visibleProducts" :key="product.productCode" class="product-card card">
           <div class="product-art" :style="{ '--product-accent': product.accentColor }">
-            <ProductIllustration :kind="product.illustration" :label="product.label" :accent-color="product.accentColor" />
+            <img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name" class="product-image" />
+            <ProductIllustration v-else :kind="product.illustration" :label="product.label" :accent-color="product.accentColor" />
           </div>
           <div class="product-content">
             <span class="product-category">{{ product.category }}</span>
@@ -206,6 +213,7 @@ const handleLogout = async () => {
 .product-card { padding: 0; overflow: hidden; }
 .product-art, .detail-art { background: color-mix(in srgb, var(--product-accent) 12%, var(--input-bg)); }
 .product-art { height: 210px; padding: 6px 20px; border-bottom: 1px solid var(--card-border); }
+.product-image { width: 100%; height: 100%; object-fit: contain; }
 .product-content { padding: 22px; }
 .product-category { display: block; font-size: 11px; color: var(--primary); margin-bottom: 9px; font-weight: 600; }
 .product-content h3 { color: var(--text-primary); font-size: 17px; font-weight: 600; line-height: 1.5; }
