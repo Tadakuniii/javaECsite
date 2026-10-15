@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { submitAuthenticationForm } from '../services/authenticationApi'
 import { getAvailableProducts, type HealthProduct, type ProductCategory } from '../services/productApi'
 import ProductIllustration from './ProductIllustration.vue'
+import ShopHeader from './ShopHeader.vue'
+import ShopIcon from './ShopIcon.vue'
+import CartView from './CartView.vue'
+import { addCartProduct, cartQuantity, setCartQuantity, type CartLine } from '../services/cart'
 
 defineProps<{ username: string; administrator: boolean }>()
 const emit = defineEmits<{
@@ -20,7 +24,48 @@ const failedProductImageIds = ref<Set<number>>(new Set())
 const productDialog = ref<HTMLDialogElement | null>(null)
 const logoutError = ref('')
 const isLoggingOut = ref(false)
+const isCart = ref(false)
+const cartLines = ref<CartLine[]>([])
+const cartCount = computed(() => cartQuantity(cartLines.value))
+const cartMessage = ref('')
 const priceFormatter = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' })
+
+const syncShopLocation = async () => {
+  isCart.value = window.location.hash === '#cart'
+  cartMessage.value = ''
+  await nextTick()
+  const headingId = isCart.value ? 'cart-title' : window.location.hash === '#product-list' ? 'products-title' : 'menu-title'
+  document.getElementById(headingId)?.focus({ preventScroll: true })
+  if (window.location.hash === '#product-list') document.getElementById('product-list')?.scrollIntoView()
+  else window.scrollTo({ top: 0 })
+}
+
+const availableToAdd = (product: HealthProduct) =>
+  (cartLines.value.find(line => line.product.id === product.id)?.quantity ?? 0) < product.stockQuantity
+
+const addToCart = async (product: HealthProduct) => {
+  if (!availableToAdd(product)) return
+  cartLines.value = addCartProduct(cartLines.value, product)
+  cartMessage.value = `${product.name}をカートに追加しました。`
+  if (selectedProduct.value) closeProductDetails()
+  if (isCart.value) {
+    await nextTick()
+    document.getElementById('cart-title')?.focus({ preventScroll: true })
+  }
+}
+
+const updateQuantity = (productId: number, quantity: number) => {
+  cartLines.value = setCartQuantity(cartLines.value, productId, quantity)
+  cartMessage.value = `カートの数量を更新しました。現在${cartCount.value}点です。`
+}
+
+const removeFromCart = async (productId: number) => {
+  const product = cartLines.value.find(line => line.product.id === productId)?.product
+  cartLines.value = cartLines.value.filter(line => line.product.id !== productId)
+  cartMessage.value = `${product?.name ?? '商品'}をカートから削除しました。`
+  await nextTick()
+  document.getElementById('cart-title')?.focus({ preventScroll: true })
+}
 
 const visibleProducts = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase('ja-JP')
@@ -32,6 +77,8 @@ const visibleProducts = computed(() => {
 
 /** ログイン後にDBから販売中の商品を読み込む。 */
 onMounted(async () => {
+  isCart.value = window.location.hash === '#cart'
+  window.addEventListener('hashchange', syncShopLocation)
   try {
     products.value = await getAvailableProducts()
   } catch (error: unknown) {
@@ -40,6 +87,8 @@ onMounted(async () => {
     isLoadingProducts.value = false
   }
 })
+
+onUnmounted(() => window.removeEventListener('hashchange', syncShopLocation))
 
 /** 選択商品の情報を表示し、ダイアログ内へフォーカスを移す。 */
 const openProductDetails = async (product: HealthProduct) => {
@@ -79,27 +128,31 @@ const handleLogout = async () => {
 
 <template>
   <div class="main-menu">
-    <header class="menu-header">
-      <div class="shop-brand">
-        <img src="/himalaya.png" alt="ヒマラヤ" class="brand-logo" />
-        <div><span class="brand-name">Web Shop</span><span class="brand-caption">サプリメントと健康雑貨</span></div>
-      </div>
-      <div class="account-menu">
-        <p class="welcome-message">ようこそ、<strong>{{ username }}</strong> 様</p>
-        <button v-if="administrator" type="button" class="logout-button" @click="emit('open-product-management')">
-          商品管理
-        </button>
-        <button type="button" class="logout-button" :disabled="isLoggingOut" @click="handleLogout">
-          {{ isLoggingOut ? 'ログアウト中…' : 'ログアウト' }}
-        </button>
-      </div>
-    </header>
+    <ShopHeader
+      :username="username"
+      :administrator="administrator"
+      :count="cartCount"
+      :is-cart="isCart"
+      :is-logging-out="isLoggingOut"
+      @logout="handleLogout"
+      @open-product-management="emit('open-product-management')"
+    />
     <div v-if="logoutError" class="alert alert-danger" role="alert">{{ logoutError }}</div>
+    <div class="cart-feedback" :class="{ visible: cartMessage }">
+      <div class="cart-announcement" role="status" aria-atomic="true"><span v-if="cartMessage"><ShopIcon name="check" />{{ cartMessage }}</span></div>
+      <div v-if="cartMessage" class="cart-toast">
+        <a v-if="!isCart" href="#cart">カートを見る <ShopIcon name="arrow" /></a>
+        <button type="button" aria-label="通知を閉じる" @click="cartMessage = ''">×</button>
+      </div>
+    </div>
+
+    <CartView v-if="isCart" :lines="cartLines" :products="products" @add="addToCart" @update-quantity="updateQuantity" @remove="removeFromCart" />
+    <template v-else>
 
     <section class="welcome-card card" aria-labelledby="menu-title">
       <div class="welcome-copy">
         <span class="section-label">毎日の健康と暮らしに</span>
-        <h1 id="menu-title">健やかな毎日を、<br />あなたらしく。</h1>
+        <h1 id="menu-title" tabindex="-1">健やかな毎日を、<br />あなたらしく。</h1>
         <p>サプリメントから、暮らしに寄り添う健康グッズまで。<br class="desktop-break" />日々の習慣に取り入れたいアイテムを見つけてみませんか。</p>
         <a href="#product-list" class="browse-products">商品を見る <span aria-hidden="true">↓</span></a>
       </div>
@@ -113,7 +166,7 @@ const handleLogout = async () => {
 
     <section id="product-list" class="products-section" aria-labelledby="products-title">
       <div class="products-heading">
-        <div><span class="section-label">お気に入りのアイテムを探す</span><h2 id="products-title">商品一覧</h2></div>
+        <div><span class="section-label">お気に入りのアイテムを探す</span><h2 id="products-title" tabindex="-1">商品一覧</h2></div>
         <span class="sample-label">サンプル商品</span>
       </div>
       <div class="product-toolbar">
@@ -147,6 +200,9 @@ const handleLogout = async () => {
             <button type="button" class="product-details-button" :aria-label="`${product.name}の詳細を見る`" @click="openProductDetails(product)">
               詳細を見る <span aria-hidden="true">→</span>
             </button>
+            <button type="button" class="btn add-cart-button" :disabled="!availableToAdd(product)" :aria-label="`${product.name}をカートに追加`" @click="addToCart(product)">
+              <ShopIcon name="cart" />{{ product.stockQuantity < 1 ? '在庫なし' : !availableToAdd(product) ? '在庫数の上限です' : 'カートに追加' }}
+            </button>
           </div>
         </article>
       </div>
@@ -156,8 +212,9 @@ const handleLogout = async () => {
         <button type="button" class="btn btn-secondary" @click="resetProductFilters">絞り込みを解除</button>
       </div>
       </template>
-      <p class="sample-note">掲載商品・価格はサンプルです。現在は商品情報の閲覧のみご利用いただけます。</p>
+      <p class="sample-note">掲載商品・価格はサンプルです。カートへの追加をお試しいただけます。購入機能は準備中です。</p>
     </section>
+    </template>
     <footer class="menu-footer">Web Shop <span>毎日の暮らしに、健やかな選択を。</span></footer>
 
     <dialog ref="productDialog" class="product-dialog" aria-labelledby="product-detail-title" @close="selectedProduct = null">
@@ -174,24 +231,20 @@ const handleLogout = async () => {
         <p class="detail-description">{{ selectedProduct.description }}</p>
         <dl class="product-specifications"><div><dt>内容量・サイズ</dt><dd>{{ selectedProduct.size }}</dd></div><div><dt>価格（税込）</dt><dd>{{ priceFormatter.format(selectedProduct.price) }}</dd></div></dl>
         <p class="sample-note">商品情報はサンプルです。</p>
-        <button type="button" class="btn" @click="closeProductDetails">商品一覧に戻る</button>
+        <button type="button" class="btn add-cart-button" :disabled="!availableToAdd(selectedProduct)" @click="addToCart(selectedProduct)"><ShopIcon name="cart" />{{ selectedProduct.stockQuantity < 1 ? '在庫なし' : !availableToAdd(selectedProduct) ? '在庫数の上限です' : 'カートに追加' }}</button>
+        <button type="button" class="btn btn-secondary" @click="closeProductDetails">商品一覧に戻る</button>
       </div>
     </dialog>
   </div>
 </template>
 
 <style scoped>
-.main-menu { width: 100%; padding-top: 12px; }
-.menu-header { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 28px; }
-.shop-brand, .account-menu { display: flex; align-items: center; gap: 16px; }
-.brand-logo { width: 62px; height: 48px; object-fit: contain; border-radius: 8px; }
-.brand-name { display: block; font-size: 23px; font-weight: 700; letter-spacing: -0.5px; }
-.brand-caption { display: block; font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-.welcome-message { font-size: 13px; overflow-wrap: anywhere; }
-.welcome-message strong { color: var(--text-primary); }
-.logout-button { padding: 9px 14px; background: var(--card-bg); border: 1px solid var(--input-border); border-radius: var(--radius-md); color: var(--text-primary); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.logout-button:hover { border-color: var(--primary); color: var(--primary); }
-.logout-button:disabled { cursor: wait; opacity: 0.6; }
+.main-menu { width: 100%; padding-top: 96px; }
+.add-cart-button { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; font-size: 12px; padding: 12px; }.add-cart-button svg { width: 18px; height: 18px; }.add-cart-button:disabled { cursor: not-allowed; }
+.cart-feedback { position: fixed; z-index: 40; bottom: 24px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); display: flex; align-items: center; gap: 20px; padding: 15px 18px; border: 1px solid var(--input-border); border-radius: 12px; background: var(--input-bg); backdrop-filter: blur(20px); box-shadow: var(--shadow-lg); opacity: 0; pointer-events: none; }.cart-feedback.visible { opacity: 1; pointer-events: auto; }
+.cart-announcement { font-size: 12px; }.cart-announcement span { display: flex; align-items: center; gap: 10px; }.cart-announcement svg { color: var(--primary); width: 18px; height: 18px; }
+.cart-toast { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }.cart-toast a { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--primary); text-decoration: none; }.cart-toast svg { width: 17px; }.cart-toast button { border: 1px solid var(--input-border); background: var(--card-bg); color: var(--text-secondary); border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-size: 18px; }
+#menu-title:focus, #products-title:focus { outline: none; }
 .welcome-card { display: grid; grid-template-columns: 1.4fr 1fr; align-items: center; padding: 44px 48px; overflow: hidden; background: linear-gradient(115deg, var(--card-bg), var(--primary-glow)); }
 .welcome-card:hover { transform: none; }
 .section-label { display: block; color: var(--primary); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; margin-bottom: 12px; }
@@ -205,7 +258,7 @@ const handleLogout = async () => {
 .hero-bottle { position: absolute; width: 245px; height: 230px; left: calc(50% - 65px); top: 45px; transform: rotate(12deg); }
 .art-sparkle { position: absolute; color: var(--primary); opacity: 0.6; font-size: 24px; }
 .sparkle-one { left: 18%; top: 16px; }.sparkle-two { right: 8%; bottom: 10px; font-size: 16px; }
-.products-section { margin-top: 40px; scroll-margin-top: 24px; }
+.products-section { margin-top: 40px; scroll-margin-top: 112px; }
 .products-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 16px; }
 .products-heading .section-label { margin-bottom: 6px; }
 .products-heading h2 { text-align: left; color: var(--text-primary); font-size: 25px; font-weight: 700; margin: 0; }
@@ -255,12 +308,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--primary); outli
   .welcome-card { padding: 32px; grid-template-columns: 1.4fr 1fr; }
   .welcome-art { transform: scale(0.85); }
   .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .account-menu { gap: 10px; }
 }
 @media (max-width: 600px) {
-  .menu-header { flex-direction: column; align-items: stretch; gap: 18px; margin-bottom: 20px; }
-  .account-menu { justify-content: space-between; }.brand-logo { width: 50px; height: 40px; }
-  .brand-name { font-size: 21px; }.welcome-message { font-size: 12px; }
+  .main-menu { padding-top: 80px; }
+  .cart-feedback { bottom: 16px; padding: 13px; gap: 12px; flex-wrap: wrap; }.cart-announcement { font-size: 11px; }.cart-toast { margin-left: auto; }
   .welcome-card { grid-template-columns: 1fr; padding: 28px 24px 12px; }
   .welcome-copy h1 { font-size: 30px; }.welcome-copy p { font-size: 12px; }
   .welcome-art { height: 230px; transform: scale(0.75); margin: 0; }
