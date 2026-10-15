@@ -1,6 +1,6 @@
 package com.example.demo;
 
-import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,7 +16,9 @@ public class ProductController {
 
     /** 販売中の商品だけを登録順で返す。 */
     @GetMapping
-    public List<ProductResponse> getAvailableProducts() {
-        return products.findAllByActiveTrueOrderById().stream().map(ProductResponse::from).toList();
+    public Map<String, Object> getAvailableProducts() {
+        var availableProducts = products.findAllByActiveTrueOrderById().stream()
+                .map(ProductResponse::from).toList();
+        return Map.of("status", "SUCCESS", "products", availableProducts);
     }
 }

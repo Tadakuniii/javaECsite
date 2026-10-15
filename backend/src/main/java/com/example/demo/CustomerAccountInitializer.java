@@ -2,7 +2,6 @@ package com.example.demo;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -49,7 +48,6 @@ public class CustomerAccountInitializer implements CommandLineRunner {
             if (!customer.getCustomerPassword().startsWith("{bcrypt}")) {
                 customer.setCustomerPassword(passwordEncoder.encode(customer.getCustomerPassword()));
             }
-            if (customer.getCreatedAt() == null) customer.setCreatedAt(LocalDateTime.now());
             customers.save(customer);
         }
     }

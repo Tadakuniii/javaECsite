@@ -25,7 +25,11 @@ export async function getAvailableProducts(): Promise<HealthProduct[]> {
       : '商品情報を取得できませんでした')
   }
   try {
-    return await response.json() as HealthProduct[]
+    const body = await response.json() as { status?: string; products?: HealthProduct[] }
+    if (body.status !== 'SUCCESS' || !Array.isArray(body.products)) {
+      throw new Error('商品情報の形式を確認できませんでした')
+    }
+    return body.products
   } catch {
     throw new Error('商品情報の形式を確認できませんでした')
   }
