@@ -8,6 +8,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "customers")
@@ -24,8 +25,10 @@ public class Customer {
     private String customerName;
     @Column(unique = true, length = 255)
     private String email;
-    // 既存行を補完してからCustomerCreatedAtMigrationがDBのNOT NULL制約を適用する。
-    @Column(updatable = false)
+    @Column(nullable = false)
+    private boolean administrator = false;
+    @ColumnDefault("CURRENT_TIMESTAMP")
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public Customer() {}

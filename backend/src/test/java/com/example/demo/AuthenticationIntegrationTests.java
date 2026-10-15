@@ -21,7 +21,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa", "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"})
+        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+        "shop.administrator-user-id=store-admin",
+        "shop.administrator-password=secure-admin-password"})
 @AutoConfigureMockMvc
 class AuthenticationIntegrationTests {
     @Autowired MockMvc api;
@@ -45,6 +47,45 @@ class AuthenticationIntegrationTests {
                 .andExpect(jsonPath("$.status").value("EXISTING_ID"));
         assertThat(customers.count()).isEqualTo(1);
         assertThat(customers.findById("test-user").orElseThrow().getCustomerPassword()).isEqualTo(storedPassword);
+    }
+
+    /** 予約済みの管理者IDを一般の会員登録APIから取得できないことを検証する。 */
+    @Test
+    void registrationRejectsReservedAdministratorId() throws Exception {
+        api.perform(post("/api/register").with(csrf()).param("userid", "store-admin")
+                        .param("password1", "attacker-password").param("password2", "attacker-password"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESERVED_ID"));
+        assertThat(customers.findById("store-admin")).isEmpty();
+    }
+
+    /** 管理者を設定された資格情報で作成し、それ以外の管理者権限を解除することを検証する。 */
+    @Test
+    void initializerProvisionsOnlyConfiguredAdministratorWithTrustedPassword() throws Exception {
+        Customer formerAdministrator = new Customer(
+                "former-admin", passwordEncoder.encode("former-password"), "旧管理者");
+        formerAdministrator.setAdministrator(true);
+        customers.saveAndFlush(formerAdministrator);
+
+        accountInitializer.run();
+
+        Customer administrator = customers.findById("store-admin").orElseThrow();
+        assertThat(administrator.isAdministrator()).isTrue();
+        assertThat(passwordEncoder.matches("secure-admin-password", administrator.getCustomerPassword())).isTrue();
+        assertThat(customers.findById("former-admin").orElseThrow().isAdministrator()).isFalse();
+    }
+
+    /** 管理者設定が不足している起動では、既存の管理者権限を維持することを検証する。 */
+    @Test
+    void incompleteAdministratorConfigurationKeepsExistingRole() throws Exception {
+        Customer existingAdministrator = new Customer(
+                "existing-admin", passwordEncoder.encode("existing-password"), "既存管理者");
+        existingAdministrator.setAdministrator(true);
+        customers.saveAndFlush(existingAdministrator);
+
+        new CustomerAccountInitializer(customers, passwordEncoder, "", "", false).run();
+
+        assertThat(customers.findById("existing-admin").orElseThrow().isAdministrator()).isTrue();
     }
 
     /** ログイン応答、セッションID更新、状態保持、ログアウト後のアクセス拒否を検証する。 */

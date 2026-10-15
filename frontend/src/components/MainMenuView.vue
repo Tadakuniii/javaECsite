@@ -4,8 +4,11 @@ import { submitAuthenticationForm } from '../services/authenticationApi'
 import { getAvailableProducts, type HealthProduct, type ProductCategory } from '../services/productApi'
 import ProductIllustration from './ProductIllustration.vue'
 
-defineProps<{ username: string }>()
-const emit = defineEmits<{ (e: 'logout-success'): void }>()
+defineProps<{ username: string; administrator: boolean }>()
+const emit = defineEmits<{
+  (e: 'logout-success'): void
+  (e: 'open-product-management'): void
+}>()
 const categories: ('すべて' | ProductCategory)[] = ['すべて', 'サプリメント', '食品・飲料', '健康グッズ']
 const selectedCategory = ref<(typeof categories)[number]>('すべて')
 const products = ref<HealthProduct[]>([])
@@ -13,6 +16,7 @@ const productLoadingError = ref('')
 const isLoadingProducts = ref(true)
 const searchQuery = ref('')
 const selectedProduct = ref<HealthProduct | null>(null)
+const failedProductImageIds = ref<Set<number>>(new Set())
 const productDialog = ref<HTMLDialogElement | null>(null)
 const logoutError = ref('')
 const isLoggingOut = ref(false)
@@ -47,6 +51,11 @@ const openProductDetails = async (product: HealthProduct) => {
 /** 商品情報を閉じ、元の商品ボタンへフォーカスを戻す。 */
 const closeProductDetails = () => { productDialog.value?.close() }
 
+/** 読み込めない商品画像を記録し、代替イラストへ切り替える。 */
+const handleProductImageError = (productId: number) => {
+  failedProductImageIds.value = new Set([...failedProductImageIds.value, productId])
+}
+
 /** 検索語とカテゴリの絞り込みを解除する。 */
 const resetProductFilters = () => {
   searchQuery.value = ''
@@ -77,6 +86,9 @@ const handleLogout = async () => {
       </div>
       <div class="account-menu">
         <p class="welcome-message">ようこそ、<strong>{{ username }}</strong> 様</p>
+        <button v-if="administrator" type="button" class="logout-button" @click="emit('open-product-management')">
+          商品管理
+        </button>
         <button type="button" class="logout-button" :disabled="isLoggingOut" @click="handleLogout">
           {{ isLoggingOut ? 'ログアウト中…' : 'ログアウト' }}
         </button>
@@ -122,7 +134,10 @@ const handleLogout = async () => {
       <div v-if="visibleProducts.length" class="product-grid">
         <article v-for="product in visibleProducts" :key="product.productCode" class="product-card card">
           <div class="product-art" :style="{ '--product-accent': product.accentColor }">
-            <ProductIllustration :kind="product.illustration" :label="product.label" :accent-color="product.accentColor" />
+            <img v-if="product.imageUrl && !failedProductImageIds.has(product.id)"
+              :src="product.imageUrl" :alt="product.name" class="product-image"
+              @error="handleProductImageError(product.id)" />
+            <ProductIllustration v-else :kind="product.illustration" :label="product.label" :accent-color="product.accentColor" />
           </div>
           <div class="product-content">
             <span class="product-category">{{ product.category }}</span>
@@ -149,7 +164,10 @@ const handleLogout = async () => {
       <div v-if="selectedProduct" class="dialog-content">
         <button type="button" class="dialog-close" aria-label="商品詳細を閉じる" autofocus @click="closeProductDetails">×</button>
         <div class="detail-art" :style="{ '--product-accent': selectedProduct.accentColor }">
-          <ProductIllustration :kind="selectedProduct.illustration" :label="selectedProduct.label" :accent-color="selectedProduct.accentColor" />
+          <img v-if="selectedProduct.imageUrl && !failedProductImageIds.has(selectedProduct.id)"
+            :src="selectedProduct.imageUrl" :alt="selectedProduct.name" class="product-image"
+            @error="handleProductImageError(selectedProduct.id)" />
+          <ProductIllustration v-else :kind="selectedProduct.illustration" :label="selectedProduct.label" :accent-color="selectedProduct.accentColor" />
         </div>
         <span class="product-category">{{ selectedProduct.category }}</span>
         <h2 id="product-detail-title">{{ selectedProduct.name }}</h2>
@@ -206,6 +224,7 @@ const handleLogout = async () => {
 .product-card { padding: 0; overflow: hidden; }
 .product-art, .detail-art { background: color-mix(in srgb, var(--product-accent) 12%, var(--input-bg)); }
 .product-art { height: 210px; padding: 6px 20px; border-bottom: 1px solid var(--card-border); }
+.product-image { width: 100%; height: 100%; object-fit: contain; }
 .product-content { padding: 22px; }
 .product-category { display: block; font-size: 11px; color: var(--primary); margin-bottom: 9px; font-weight: 600; }
 .product-content h3 { color: var(--text-primary); font-size: 17px; font-weight: 600; line-height: 1.5; }

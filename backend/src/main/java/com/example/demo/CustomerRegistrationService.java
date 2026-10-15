@@ -6,6 +6,7 @@ import jakarta.validation.Validator;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,13 +16,17 @@ public class CustomerRegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final Validator registrationValidator;
+    private final String administratorUserId;
 
     /** 顧客保存、パスワード保護、入力検証の依存を受け取る。 */
-    public CustomerRegistrationService(CustomerRepository customers, PasswordEncoder passwordEncoder, EntityManager entityManager, Validator registrationValidator) {
+    public CustomerRegistrationService(CustomerRepository customers, PasswordEncoder passwordEncoder,
+                                       EntityManager entityManager, Validator registrationValidator,
+                                       @Value("${shop.administrator-user-id:}") String administratorUserId) {
         this.customers = customers;
         this.passwordEncoder = passwordEncoder;
         this.entityManager = entityManager;
         this.registrationValidator = registrationValidator;
+        this.administratorUserId = administratorUserId.strip();
     }
 
     /** 入力と重複を検証し、ハッシュ化したパスワードで顧客を登録する。 */
@@ -34,6 +39,9 @@ public class CustomerRegistrationService {
         }
         if (registration.password1().getBytes(StandardCharsets.UTF_8).length > 72) {
             return Map.of("status", "VALIDATION_ERROR", "message", "パスワードが長すぎます。文字数を減らしてください");
+        }
+        if (!administratorUserId.isBlank() && administratorUserId.equals(registration.userid())) {
+            return Map.of("status", "RESERVED_ID", "message", "このユーザIDは登録できません");
         }
         if (customers.existsById(registration.userid())) {
             return Map.of("status", "EXISTING_ID", "message", "入力されたユーザIDは登録済です");
