@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { submitAuthenticationForm } from '../services/authenticationApi'
 
 const emit = defineEmits<{
-  (e: 'change-view', view: 'register' | 'login' | 'success' | 'register-success'): void
+  (e: 'change-view', view: 'register' | 'login' | 'register-success'): void
 }>()
 
 const userid = ref('')

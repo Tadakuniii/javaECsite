@@ -47,8 +47,8 @@ public class CustomerAccountInitializer implements CommandLineRunner {
         for (Customer customer : customers.findAll()) {
             if (!customer.getCustomerPassword().startsWith("{bcrypt}")) {
                 customer.setCustomerPassword(passwordEncoder.encode(customer.getCustomerPassword()));
-                customers.save(customer);
             }
+            customers.save(customer);
         }
     }
 }
