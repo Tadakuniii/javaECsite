@@ -149,6 +149,12 @@ class ProductCatalogIntegrationTests {
         ShoppingCart createdCart = carts.findByCustomerCustomerId("cart-customer").orElseThrow();
         long itemId = cartItems.findAllByCartIdOrderById(createdCart.getId()).getFirst().getId();
 
+        api.perform(post("/api/cart/items")
+                        .with(user("cart-customer")).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"productId\":" + product.getId() + ",\"quantity\":2147483647}"))
+                .andExpect(status().isBadRequest());
+
         api.perform(put("/api/cart/items/{itemId}", itemId)
                         .with(user("cart-customer")).with(csrf())
                         .contentType("application/json").content("{\"quantity\":3}"))

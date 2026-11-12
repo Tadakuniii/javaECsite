@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { changeCartItemQuantity, removeCartItem, type ShoppingCart } from '../services/shoppingCartApi'
 import ProductIllustration from './ProductIllustration.vue'
 
@@ -11,7 +11,37 @@ const emit = defineEmits<{
 const updatingItemId = ref<number>()
 const errorMessage = ref('')
 const failedImageIds = ref<Set<number>>(new Set())
+const drawer = ref<HTMLElement>()
+const closeButton = ref<HTMLButtonElement>()
 const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' })
+
+onMounted(async () => {
+  await nextTick()
+  closeButton.value?.focus()
+})
+
+/** Tabキーの移動をカゴ内に制限し、Escapeキーで閉じる。 */
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    emit('close')
+    return
+  }
+  if (event.key !== 'Tab' || !drawer.value) return
+  const focusableElements = [...drawer.value.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+  )].filter(element => !element.hasAttribute('hidden'))
+  if (!focusableElements.length) return
+  const first = focusableElements[0]
+  const last = focusableElements[focusableElements.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last?.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first?.focus()
+  }
+}
 
 const updateQuantity = async (itemId: number, quantity: number) => {
   updatingItemId.value = itemId
@@ -40,10 +70,10 @@ const removeItem = async (itemId: number) => {
 
 <template>
   <div class="cart-backdrop" @click.self="emit('close')">
-    <aside class="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title">
+    <aside ref="drawer" class="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" @keydown="handleKeydown">
       <header class="cart-header">
         <div><span class="cart-caption">SHOPPING CART</span><h2 id="cart-title">買い物カゴ</h2></div>
-        <button type="button" class="cart-close" aria-label="買い物カゴを閉じる" @click="emit('close')">×</button>
+        <button ref="closeButton" type="button" class="cart-close" aria-label="買い物カゴを閉じる" @click="emit('close')">×</button>
       </header>
       <div v-if="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
 

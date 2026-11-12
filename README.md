@@ -95,7 +95,7 @@ docker compose -p javaecsite -f backend/docker-compose.dev.yml logs -f
 
 ```bash
 docker compose -p javaecsite -f backend/docker-compose.dev.yml exec backend gradle --no-daemon test
-docker compose -p javaecsite -f backend/docker-compose.dev.yml exec frontend bun run test
+docker run --rm -v "$PWD/frontend:/app" -w /app node:24-bookworm-slim npm test
 ```
 
 ## 主な機能

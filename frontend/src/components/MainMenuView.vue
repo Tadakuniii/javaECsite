@@ -27,6 +27,7 @@ const isCartOpen = ref(false)
 const cartMessage = ref('')
 const cartError = ref('')
 const addingProductId = ref<number>()
+const cartOpenButton = ref<HTMLElement>()
 let cartMessageTimer: ReturnType<typeof setTimeout> | undefined
 const priceFormatter = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' })
 
@@ -40,16 +41,36 @@ const visibleProducts = computed(() => {
 
 /** ログイン後にDBから販売中の商品を読み込む。 */
 onMounted(async () => {
-  try {
-    const [availableProducts, shoppingCart] = await Promise.all([getAvailableProducts(), getShoppingCart()])
-    products.value = availableProducts
-    cart.value = shoppingCart
-  } catch (error: unknown) {
-    productLoadingError.value = error instanceof Error ? error.message : '商品情報を取得できませんでした'
-  } finally {
-    isLoadingProducts.value = false
+  const loadProducts = async () => {
+    try {
+      products.value = await getAvailableProducts()
+    } catch (error: unknown) {
+      productLoadingError.value = error instanceof Error ? error.message : '商品情報を取得できませんでした'
+    } finally {
+      isLoadingProducts.value = false
+    }
   }
+  const loadCart = async () => {
+    try {
+      cart.value = await getShoppingCart()
+    } catch (error: unknown) {
+      cartError.value = error instanceof Error ? error.message : '買い物カゴを取得できませんでした'
+    }
+  }
+  await Promise.allSettled([loadProducts(), loadCart()])
 })
+
+const openCart = (event: Event) => {
+  cartOpenButton.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined
+  isCartOpen.value = true
+}
+
+const closeCart = async () => {
+  isCartOpen.value = false
+  await nextTick()
+  cartOpenButton.value?.focus()
+  cartOpenButton.value = undefined
+}
 
 /** 商品を1点追加し、ヘッダーのカゴ件数と内容を更新する。 */
 const addToCart = async (product: HealthProduct) => {
@@ -117,7 +138,7 @@ const handleLogout = async () => {
       </div>
       <div class="account-menu">
         <p class="welcome-message">ようこそ、<strong>{{ username }}</strong> 様</p>
-        <button type="button" class="cart-button" aria-label="買い物カゴを開く" @click="isCartOpen = true">
+        <button type="button" class="cart-button" aria-label="買い物カゴを開く" @click="openCart">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20 7H6"/><circle cx="10" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
           <span>カゴ</span><strong v-if="cart.totalQuantity">{{ cart.totalQuantity }}</strong>
         </button>
@@ -136,7 +157,7 @@ const handleLogout = async () => {
         <div v-if="cartMessage" class="cart-toast" role="status">
           <span class="toast-check" aria-hidden="true">✓</span>
           <div><strong>カゴに追加しました</strong><p>{{ cartMessage }}</p></div>
-          <button type="button" @click="isCartOpen = true; cartMessage = ''">カゴを見る</button>
+          <button type="button" @click="openCart($event); cartMessage = ''">カゴを見る</button>
           <button type="button" class="toast-close" aria-label="通知を閉じる" @click="cartMessage = ''">×</button>
         </div>
       </Transition>
@@ -230,7 +251,7 @@ const handleLogout = async () => {
       </div>
     </dialog>
     <Teleport to="body">
-      <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" @close="isCartOpen = false" @updated="cart = $event" />
+      <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" @close="closeCart" @updated="cart = $event" />
     </Teleport>
   </div>
 </template>
