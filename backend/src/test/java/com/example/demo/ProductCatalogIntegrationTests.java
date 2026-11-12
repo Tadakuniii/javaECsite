@@ -100,7 +100,7 @@ class ProductCatalogIntegrationTests {
     void productManagementRequiresAdministratorAndCanCreateAndUpdateProducts() throws Exception {
         String productJson = """
                 {"name":"テスト青汁","category":"食品・飲料","description":"国産野菜の青汁です。",
-                 "price":1200,"stockQuantity":25,"imageUrl":"","active":true}
+                 "sizeDescription":"30包","price":1200,"stockQuantity":25,"imageUrl":"","active":true}
                 """;
         api.perform(get("/api/admin/products").with(user("customer").roles("CUSTOMER")))
                 .andExpect(status().isForbidden());
@@ -108,19 +108,21 @@ class ProductCatalogIntegrationTests {
                         .contentType("application/json").content(productJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("テスト青汁"))
+                .andExpect(jsonPath("$.sizeDescription").value("30包"))
                 .andExpect(jsonPath("$.imageUrl").doesNotExist())
                 .andExpect(jsonPath("$.active").value(true));
 
         Product created = products.findAllByOrderById().getLast();
         String updateJson = """
                 {"name":"テスト青汁 改良版","category":"食品・飲料","description":"説明を更新しました。",
-                 "price":1350,"stockQuantity":10,"imageUrl":"https://example.com/aojiru.png","active":false}
+                 "sizeDescription":"45包","price":1350,"stockQuantity":10,"imageUrl":"https://example.com/aojiru.png","active":false}
                 """;
         api.perform(put("/api/admin/products/{id}", created.getId())
                         .with(user("admin").roles("ADMIN")).with(csrf())
                         .contentType("application/json").content(updateJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.price").value(1350))
+                .andExpect(jsonPath("$.sizeDescription").value("45包"))
                 .andExpect(jsonPath("$.stockQuantity").value(10))
                 .andExpect(jsonPath("$.active").value(false));
         api.perform(get("/api/products").with(user("customer")))
