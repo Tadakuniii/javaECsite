@@ -4,12 +4,13 @@ import type { HealthProduct } from '../services/productApi'
 import { changeCartItemQuantity, removeCartItem, type ShoppingCart } from '../services/shoppingCartApi'
 import ProductIllustration from './ProductIllustration.vue'
 
-const props = defineProps<{ cart: ShoppingCart; products: HealthProduct[]; externalError?: string }>()
+const props = defineProps<{ cart: ShoppingCart; products: HealthProduct[]; externalError?: string; checkingOut?: boolean }>()
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'updated', cart: ShoppingCart): void
   (e: 'add', product: HealthProduct): void
   (e: 'clear-external-error'): void
+  (e: 'checkout'): void
 }>()
 const updatingItemId = ref<number>()
 const errorMessage = ref('')
@@ -129,7 +130,9 @@ const addRecommendedProduct = (product: HealthProduct) => {
       </div>
       <footer class="cart-footer">
         <div><span>合計（{{ cart.totalQuantity }}点）</span><strong>{{ yen.format(cart.totalPrice) }}</strong></div>
-        <button type="button" class="btn" :disabled="!cart.items.length">購入手続きへ</button>
+        <button type="button" class="btn" :disabled="!cart.items.length || checkingOut" @click="emit('checkout')">
+          {{ checkingOut ? '購入処理中…' : '購入手続きへ' }}
+        </button>
         <button type="button" class="continue-button" @click="emit('close')">買い物を続ける</button>
       </footer>
     </aside>

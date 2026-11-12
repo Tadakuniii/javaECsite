@@ -1,4 +1,5 @@
-import type { ProductIllustrationKind } from './productApi'
+import type { ProductIllustrationKind } from './productApi.js'
+import type { CustomerOrder } from './orderApi.js'
 
 export interface ShoppingCartItem {
   id: number
@@ -25,7 +26,7 @@ export const emptyShoppingCart = (): ShoppingCart => ({ items: [], totalQuantity
 let cartOperationQueue: Promise<void> = Promise.resolve()
 
 /** カゴの取得と更新を順番に実行し、古い応答による表示の巻き戻りを防ぐ。 */
-function enqueueCartOperation(operation: () => Promise<ShoppingCart>): Promise<ShoppingCart> {
+function enqueueCartOperation<T>(operation: () => Promise<T>): Promise<T> {
   const result = cartOperationQueue.then(operation, operation)
   cartOperationQueue = result.then(() => undefined, () => undefined)
   return result
@@ -76,4 +77,20 @@ export async function removeCartItem(itemId: number): Promise<ShoppingCart> {
     credentials: 'same-origin',
     headers: await csrfHeaders(),
   })))
+}
+
+/** 未完了のカゴ更新を待ってから、現在の内容を注文として確定する。 */
+export async function checkoutShoppingCart(): Promise<CustomerOrder> {
+  return enqueueCartOperation(async () => {
+    const response = await fetch('/api/orders', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: await csrfHeaders(),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { detail?: string; message?: string } | null
+      throw new Error(body?.detail || body?.message || '購入手続きを完了できませんでした')
+    }
+    return await response.json() as CustomerOrder
+  })
 }
