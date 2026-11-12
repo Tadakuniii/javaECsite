@@ -131,14 +131,16 @@ const handleLogout = async () => {
     </header>
     <div v-if="logoutError" class="alert alert-danger" role="alert">{{ logoutError }}</div>
     <div v-if="cartError" class="alert alert-danger" role="alert">{{ cartError }}</div>
-    <Transition name="cart-toast">
-      <div v-if="cartMessage" class="cart-toast" role="status">
-        <span class="toast-check" aria-hidden="true">✓</span>
-        <div><strong>カゴに追加しました</strong><p>{{ cartMessage }}</p></div>
-        <button type="button" @click="isCartOpen = true; cartMessage = ''">カゴを見る</button>
-        <button type="button" class="toast-close" aria-label="通知を閉じる" @click="cartMessage = ''">×</button>
-      </div>
-    </Transition>
+    <Teleport to="body">
+      <Transition name="cart-toast">
+        <div v-if="cartMessage" class="cart-toast" role="status">
+          <span class="toast-check" aria-hidden="true">✓</span>
+          <div><strong>カゴに追加しました</strong><p>{{ cartMessage }}</p></div>
+          <button type="button" @click="isCartOpen = true; cartMessage = ''">カゴを見る</button>
+          <button type="button" class="toast-close" aria-label="通知を閉じる" @click="cartMessage = ''">×</button>
+        </div>
+      </Transition>
+    </Teleport>
 
     <section class="welcome-card card" aria-labelledby="menu-title">
       <div class="welcome-copy">
