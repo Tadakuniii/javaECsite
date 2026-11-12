@@ -2,6 +2,11 @@ package com.example.demo;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -39,6 +45,7 @@ class ProductCatalogIntegrationTests {
     @Autowired OrderItemRepository orderItems;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired ProductCatalogInitializer catalogInitializer;
+    @Autowired ShoppingCartService shoppingCartService;
     @Autowired JdbcTemplate database;
     @PersistenceContext EntityManager entityManager;
 
@@ -100,7 +107,7 @@ class ProductCatalogIntegrationTests {
     void productManagementRequiresAdministratorAndCanCreateAndUpdateProducts() throws Exception {
         String productJson = """
                 {"name":"テスト青汁","category":"食品・飲料","description":"国産野菜の青汁です。",
-                 "price":1200,"stockQuantity":25,"imageUrl":"","active":true}
+                 "sizeDescription":"30包","price":1200,"stockQuantity":25,"imageUrl":"","active":true}
                 """;
         api.perform(get("/api/admin/products").with(user("customer").roles("CUSTOMER")))
                 .andExpect(status().isForbidden());
@@ -108,23 +115,103 @@ class ProductCatalogIntegrationTests {
                         .contentType("application/json").content(productJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("テスト青汁"))
+                .andExpect(jsonPath("$.sizeDescription").value("30包"))
                 .andExpect(jsonPath("$.imageUrl").doesNotExist())
                 .andExpect(jsonPath("$.active").value(true));
 
         Product created = products.findAllByOrderById().getLast();
         String updateJson = """
                 {"name":"テスト青汁 改良版","category":"食品・飲料","description":"説明を更新しました。",
-                 "price":1350,"stockQuantity":10,"imageUrl":"https://example.com/aojiru.png","active":false}
+                 "sizeDescription":"45包","price":1350,"stockQuantity":10,"imageUrl":"https://example.com/aojiru.png","active":false}
                 """;
         api.perform(put("/api/admin/products/{id}", created.getId())
                         .with(user("admin").roles("ADMIN")).with(csrf())
                         .contentType("application/json").content(updateJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.price").value(1350))
+                .andExpect(jsonPath("$.sizeDescription").value("45包"))
                 .andExpect(jsonPath("$.stockQuantity").value(10))
                 .andExpect(jsonPath("$.active").value(false));
         api.perform(get("/api/products").with(user("customer")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("テスト青汁 改良版"))));
+    }
+
+    /** ログインユーザーが商品を追加し、数量変更と削除を行えることを検証する。 */
+    @Test
+    void shoppingCartKeepsItemsPerCustomerAndCalculatesTotals() throws Exception {
+        customers.save(new Customer("cart-customer", passwordEncoder.encode("password123"), "カゴ利用者"));
+        customers.save(new Customer("other-customer", passwordEncoder.encode("password123"), "別の利用者"));
+        Product product = products.findAllByActiveTrueOrderById().getFirst();
+        String addJson = "{\"productId\":" + product.getId() + ",\"quantity\":1}";
+
+        api.perform(post("/api/cart/items")
+                        .with(user("cart-customer")).with(csrf())
+                        .contentType("application/json").content(addJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalQuantity").value(1))
+                .andExpect(jsonPath("$.totalPrice").value(product.getPrice()))
+                .andExpect(jsonPath("$.items[0].name").value(product.getName()))
+                .andReturn();
+        ShoppingCart createdCart = carts.findByCustomerCustomerId("cart-customer").orElseThrow();
+        long itemId = cartItems.findAllByCartIdOrderById(createdCart.getId()).getFirst().getId();
+
+        api.perform(post("/api/cart/items")
+                        .with(user("cart-customer")).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"productId\":" + product.getId() + ",\"quantity\":2147483647}"))
+                .andExpect(status().isBadRequest());
+
+        api.perform(put("/api/cart/items/{itemId}", itemId)
+                        .with(user("cart-customer")).with(csrf())
+                        .contentType("application/json").content("{\"quantity\":3}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalQuantity").value(3))
+                .andExpect(jsonPath("$.totalPrice").value(product.getPrice() * 3));
+        api.perform(delete("/api/cart/items/{itemId}", itemId)
+                        .with(user("other-customer")).with(csrf()))
+                .andExpect(status().isNotFound());
+        api.perform(delete("/api/cart/items/{itemId}", itemId)
+                        .with(user("cart-customer")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalQuantity").value(0));
+    }
+
+    /** 初回カゴ作成と同じ商品の追加が同時でも、1つのカゴへ数量が加算されることを検証する。 */
+    @Test
+    void concurrentAddsCreateOneCartWithoutLosingQuantity() throws Exception {
+        String customerId = "concurrent-cart-customer";
+        customers.save(new Customer(customerId, passwordEncoder.encode("password123"), "同時追加利用者"));
+        Product product = products.findAllByActiveTrueOrderById().getFirst();
+        AddCartItemRequest request = new AddCartItemRequest(product.getId(), 1);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<ShoppingCartResponse> first = executor.submit(() -> {
+                ready.countDown();
+                if (!start.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("開始待機がタイムアウトしました");
+                return shoppingCartService.addItem(customerId, request);
+            });
+            Future<ShoppingCartResponse> second = executor.submit(() -> {
+                ready.countDown();
+                if (!start.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("開始待機がタイムアウトしました");
+                return shoppingCartService.addItem(customerId, request);
+            });
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdownNow();
+        }
+
+        ShoppingCart cart = carts.findByCustomerCustomerId(customerId).orElseThrow();
+        assertThat(carts.findAll()).filteredOn(savedCart -> savedCart.getCustomer().getCustomerId().equals(customerId))
+                .hasSize(1);
+        assertThat(cartItems.findAllByCartIdOrderById(cart.getId())).singleElement()
+                .extracting(CartItem::getQuantity).isEqualTo(2);
     }
 
     /** カート関連と注文時の商品情報の保存を検証する。 */

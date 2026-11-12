@@ -6,6 +6,7 @@ public record ManagedProductResponse(
         String name,
         String category,
         String description,
+        String sizeDescription,
         int price,
         int stockQuantity,
         String imageUrl,
@@ -13,7 +14,7 @@ public record ManagedProductResponse(
 
     static ManagedProductResponse from(Product product) {
         return new ManagedProductResponse(product.getId(), product.getProductCode(), product.getName(),
-                product.getCategory().getName(), product.getDescription(), product.getPrice(),
+                product.getCategory().getName(), product.getDescription(), product.getSizeDescription(), product.getPrice(),
                 product.getStockQuantity(), product.getImageUrl(), product.isActive());
     }
 }

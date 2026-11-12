@@ -6,6 +6,7 @@ export interface ManagedProduct {
   name: string
   category: ProductCategory
   description: string
+  sizeDescription: string
   price: number
   stockQuantity: number
   imageUrl?: string
@@ -13,7 +14,7 @@ export interface ManagedProduct {
 }
 
 export type ProductInput = Pick<ManagedProduct,
-  'name' | 'category' | 'description' | 'price' | 'stockQuantity' | 'imageUrl' | 'active'>
+  'name' | 'category' | 'description' | 'sizeDescription' | 'price' | 'stockQuantity' | 'imageUrl' | 'active'>
 
 async function getCsrfHeader(): Promise<Record<string, string>> {
   const response = await fetch('/api/csrf', { credentials: 'same-origin' })

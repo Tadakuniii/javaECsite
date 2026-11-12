@@ -11,7 +11,7 @@ const isLoading = ref(true)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
-const emptyForm = (): ProductInput => ({ name: '', category: 'サプリメント', description: '', price: 0, stockQuantity: 0, imageUrl: '', active: true })
+const emptyForm = (): ProductInput => ({ name: '', category: 'サプリメント', description: '', sizeDescription: '', price: 0, stockQuantity: 0, imageUrl: '', active: true })
 const form = reactive<ProductInput>(emptyForm())
 
 onMounted(async () => {
@@ -29,7 +29,7 @@ const resetForm = () => {
 
 const editProduct = (product: ManagedProduct) => {
   editingProductId.value = product.id
-  Object.assign(form, { name: product.name, category: product.category, description: product.description, price: product.price, stockQuantity: product.stockQuantity, imageUrl: product.imageUrl || '', active: product.active })
+  Object.assign(form, { name: product.name, category: product.category, description: product.description, sizeDescription: product.sizeDescription, price: product.price, stockQuantity: product.stockQuantity, imageUrl: product.imageUrl || '', active: product.active })
   errorMessage.value = ''
   successMessage.value = ''
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -74,6 +74,7 @@ const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' 
         <div class="form-group wide"><label for="product-name">商品名</label><input id="product-name" v-model.trim="form.name" class="input-control" maxlength="200" required /></div>
         <div class="form-group"><label for="category">カテゴリ</label><select id="category" v-model="form.category" class="input-control"><option v-for="category in categories" :key="category">{{ category }}</option></select></div>
         <div class="form-group"><label for="stock">数量（在庫数）</label><input id="stock" v-model.number="form.stockQuantity" class="input-control" type="number" min="0" required /></div>
+        <div class="form-group"><label for="size-description">内容量・サイズ</label><input id="size-description" v-model.trim="form.sizeDescription" class="input-control" maxlength="100" placeholder="例：60粒、500ml、幅61cm × 長さ173cm" required /></div>
         <div class="form-group"><label for="price">価格（税込・円）</label><input id="price" v-model.number="form.price" class="input-control" type="number" min="0" required /></div>
         <div class="form-group"><label for="image-url">画像URL（任意）</label><input id="image-url" v-model.trim="form.imageUrl" class="input-control" type="url" maxlength="500" placeholder="未設定でも登録できます" /></div>
         <div class="form-group wide"><label for="description">説明</label><textarea id="description" v-model.trim="form.description" class="input-control" rows="4" maxlength="2000" required></textarea></div>
@@ -88,7 +89,7 @@ const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' 
       <div v-else class="product-rows">
         <article v-for="product in products" :key="product.id" class="product-row card">
           <div class="thumbnail"><img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name" /><span v-else>画像なし</span></div>
-          <div class="product-summary"><span class="category">{{ product.category }}</span><h3>{{ product.name }}</h3><p>{{ yen.format(product.price) }} · 在庫 {{ product.stockQuantity }}</p></div>
+          <div class="product-summary"><span class="category">{{ product.category }}</span><h3>{{ product.name }}</h3><p>{{ product.sizeDescription }} · {{ yen.format(product.price) }} · 在庫 {{ product.stockQuantity }}</p></div>
           <span :class="['status', { inactive: !product.active }]">{{ product.active ? '販売中' : '販売停止' }}</span>
           <button type="button" class="edit-button" @click="editProduct(product)">編集</button>
         </article>

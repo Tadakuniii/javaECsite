@@ -23,7 +23,7 @@ public class ProductManagementService {
         ProductCategory category = findCategory(request.category());
         String productCode = createUniqueProductCode(request.name());
         Product product = new Product(productCode, category, request.name().strip(), request.description().strip(),
-                request.price(), request.stockQuantity(), "未設定", request.name().strip(),
+                request.price(), request.stockQuantity(), request.sizeDescription().strip(), request.name().strip(),
                 "#7881b9", "bottle");
         applyEditableValues(product, request);
         return ManagedProductResponse.from(products.save(product));
@@ -47,6 +47,7 @@ public class ProductManagementService {
     private void applyEditableValues(Product product, ProductManagementRequest request) {
         product.setName(request.name().strip());
         product.setDescription(request.description().strip());
+        product.setSizeDescription(request.sizeDescription().strip());
         product.setPrice(request.price());
         product.setStockQuantity(request.stockQuantity());
         product.setImageUrl(request.imageUrl() == null || request.imageUrl().isBlank() ? null : request.imageUrl().strip());
