@@ -229,7 +229,9 @@ const handleLogout = async () => {
         <button type="button" class="detail-back-button" @click="closeProductDetails">商品一覧に戻る</button>
       </div>
     </dialog>
-    <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" @close="isCartOpen = false" @updated="cart = $event" />
+    <Teleport to="body">
+      <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" @close="isCartOpen = false" @updated="cart = $event" />
+    </Teleport>
   </div>
 </template>
 
