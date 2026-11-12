@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { submitAuthenticationForm } from '../services/authenticationApi'
 import { getAvailableProducts, type HealthProduct, type ProductCategory } from '../services/productApi'
 import { addProductToCart, emptyShoppingCart, getShoppingCart } from '../services/shoppingCartApi'
+import { checkoutShoppingCart } from '../services/orderApi'
 import ProductIllustration from './ProductIllustration.vue'
 import ShoppingCartDrawer from './ShoppingCartDrawer.vue'
 
@@ -10,6 +11,7 @@ defineProps<{ username: string; administrator: boolean }>()
 const emit = defineEmits<{
   (e: 'logout-success'): void
   (e: 'open-product-management'): void
+  (e: 'open-order-history', purchased: boolean): void
 }>()
 const categories: ('すべて' | ProductCategory)[] = ['すべて', 'サプリメント', '食品・飲料', '健康グッズ']
 const selectedCategory = ref<(typeof categories)[number]>('すべて')
@@ -27,6 +29,7 @@ const isCartOpen = ref(false)
 const cartMessage = ref('')
 const cartError = ref('')
 const addingProductId = ref<number>()
+const isCheckingOut = ref(false)
 const cartOpenButton = ref<HTMLElement>()
 const headerCartButton = ref<HTMLButtonElement>()
 const cartToast = ref<HTMLElement>()
@@ -100,6 +103,22 @@ const addToCart = async (product: HealthProduct) => {
   }
 }
 
+/** カゴの内容を注文として確定し、注文履歴画面へ移動する。 */
+const checkout = async () => {
+  cartError.value = ''
+  isCheckingOut.value = true
+  try {
+    await checkoutShoppingCart()
+    cart.value = emptyShoppingCart()
+    isCartOpen.value = false
+    emit('open-order-history', true)
+  } catch (error: unknown) {
+    cartError.value = error instanceof Error ? error.message : '購入手続きを完了できませんでした'
+  } finally {
+    isCheckingOut.value = false
+  }
+}
+
 onBeforeUnmount(() => {
   if (cartMessageTimer) clearTimeout(cartMessageTimer)
 })
@@ -153,6 +172,7 @@ const handleLogout = async () => {
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20 7H6"/><circle cx="10" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
           <span>カゴ</span><strong v-if="cart.totalQuantity">{{ cart.totalQuantity }}</strong>
         </button>
+        <button type="button" class="logout-button" @click="emit('open-order-history', false)">注文履歴</button>
         <button v-if="administrator" type="button" class="logout-button" @click="emit('open-product-management')">
           商品管理
         </button>
@@ -260,8 +280,8 @@ const handleLogout = async () => {
       </div>
     </dialog>
     <Teleport to="body">
-      <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" :products="products" :external-error="cartError"
-        @close="closeCart" @updated="cart = $event" @add="addToCart" @clear-external-error="cartError = ''" />
+      <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" :products="products" :external-error="cartError" :checking-out="isCheckingOut"
+        @close="closeCart" @updated="cart = $event" @add="addToCart" @checkout="checkout" @clear-external-error="cartError = ''" />
     </Teleport>
   </div>
 </template>

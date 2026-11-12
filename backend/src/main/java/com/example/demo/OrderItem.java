@@ -36,6 +36,9 @@ public class OrderItem {
     @Column(nullable = false, length = 200)
     private String productName;
 
+    @Column(length = 100)
+    private String sizeDescription;
+
     @Column(nullable = false)
     private int unitPrice;
 
@@ -48,6 +51,7 @@ public class OrderItem {
         this.order = order;
         this.product = product;
         this.productName = product.getName();
+        this.sizeDescription = product.getSizeDescription();
         this.unitPrice = product.getPrice();
         this.quantity = quantity;
     }

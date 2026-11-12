@@ -1,4 +1,4 @@
-import type { ProductIllustrationKind } from './productApi'
+import type { ProductIllustrationKind } from './productApi.js'
 
 export interface ShoppingCartItem {
   id: number
