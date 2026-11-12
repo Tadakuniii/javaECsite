@@ -261,7 +261,7 @@ const handleLogout = async () => {
     </dialog>
     <Teleport to="body">
       <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" :products="products" :external-error="cartError"
-        @close="closeCart" @updated="cart = $event" @add="addToCart" />
+        @close="closeCart" @updated="cart = $event" @add="addToCart" @clear-external-error="cartError = ''" />
     </Teleport>
   </div>
 </template>

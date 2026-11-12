@@ -9,6 +9,7 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'updated', cart: ShoppingCart): void
   (e: 'add', product: HealthProduct): void
+  (e: 'clear-external-error'): void
 }>()
 const updatingItemId = ref<number>()
 const errorMessage = ref('')
@@ -49,6 +50,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 const updateQuantity = async (itemId: number, quantity: number) => {
+  emit('clear-external-error')
   updatingItemId.value = itemId
   errorMessage.value = ''
   try {
@@ -61,6 +63,7 @@ const updateQuantity = async (itemId: number, quantity: number) => {
 }
 
 const removeItem = async (itemId: number) => {
+  emit('clear-external-error')
   updatingItemId.value = itemId
   errorMessage.value = ''
   try {
@@ -71,6 +74,11 @@ const removeItem = async (itemId: number) => {
     updatingItemId.value = undefined
   }
 }
+
+const addRecommendedProduct = (product: HealthProduct) => {
+  errorMessage.value = ''
+  emit('add', product)
+}
 </script>
 
 <template>
@@ -80,7 +88,7 @@ const removeItem = async (itemId: number) => {
         <div><span class="cart-caption">SHOPPING CART</span><h2 id="cart-title">買い物カゴ</h2></div>
         <button ref="closeButton" type="button" class="cart-close" aria-label="買い物カゴを閉じる" @click="emit('close')">×</button>
       </header>
-      <div v-if="errorMessage || externalError" class="alert alert-danger" role="alert">{{ errorMessage || externalError }}</div>
+      <div v-if="externalError || errorMessage" class="alert alert-danger" role="alert">{{ externalError || errorMessage }}</div>
 
       <div class="cart-content">
       <div v-if="cart.items.length" class="cart-items">
@@ -115,7 +123,7 @@ const removeItem = async (itemId: number) => {
         <div><span class="cart-caption">RECOMMENDED</span><h3 id="recommendations-title">こちらもおすすめ</h3></div>
         <article v-for="product in recommendedProducts" :key="product.id" class="recommendation-item">
           <div><strong>{{ product.name }}</strong><span>{{ yen.format(product.price) }}</span></div>
-          <button type="button" :aria-label="`${product.name}を買い物カゴに追加`" @click="emit('add', product)">＋ 追加</button>
+          <button type="button" :aria-label="`${product.name}を買い物カゴに追加`" @click="addRecommendedProduct(product)">＋ 追加</button>
         </article>
       </section>
       </div>
