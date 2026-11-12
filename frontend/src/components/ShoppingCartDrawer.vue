@@ -4,7 +4,7 @@ import type { HealthProduct } from '../services/productApi'
 import { changeCartItemQuantity, removeCartItem, type ShoppingCart } from '../services/shoppingCartApi'
 import ProductIllustration from './ProductIllustration.vue'
 
-const props = defineProps<{ cart: ShoppingCart; products: HealthProduct[] }>()
+const props = defineProps<{ cart: ShoppingCart; products: HealthProduct[]; externalError?: string }>()
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'updated', cart: ShoppingCart): void
@@ -80,7 +80,7 @@ const removeItem = async (itemId: number) => {
         <div><span class="cart-caption">SHOPPING CART</span><h2 id="cart-title">買い物カゴ</h2></div>
         <button ref="closeButton" type="button" class="cart-close" aria-label="買い物カゴを閉じる" @click="emit('close')">×</button>
       </header>
-      <div v-if="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
+      <div v-if="errorMessage || externalError" class="alert alert-danger" role="alert">{{ errorMessage || externalError }}</div>
 
       <div class="cart-content">
       <div v-if="cart.items.length" class="cart-items">

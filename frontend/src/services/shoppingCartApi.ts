@@ -22,12 +22,12 @@ export interface ShoppingCart {
 
 export const emptyShoppingCart = (): ShoppingCart => ({ items: [], totalQuantity: 0, totalPrice: 0 })
 
-let cartMutationQueue: Promise<void> = Promise.resolve()
+let cartOperationQueue: Promise<void> = Promise.resolve()
 
-/** カゴ全体を返す更新処理を順番に実行し、古い応答による表示の巻き戻りを防ぐ。 */
-function enqueueCartMutation(operation: () => Promise<ShoppingCart>): Promise<ShoppingCart> {
-  const result = cartMutationQueue.then(operation, operation)
-  cartMutationQueue = result.then(() => undefined, () => undefined)
+/** カゴの取得と更新を順番に実行し、古い応答による表示の巻き戻りを防ぐ。 */
+function enqueueCartOperation(operation: () => Promise<ShoppingCart>): Promise<ShoppingCart> {
+  const result = cartOperationQueue.then(operation, operation)
+  cartOperationQueue = result.then(() => undefined, () => undefined)
   return result
 }
 
@@ -47,11 +47,13 @@ async function readCartResponse(response: Response): Promise<ShoppingCart> {
 }
 
 export async function getShoppingCart(): Promise<ShoppingCart> {
-  return readCartResponse(await fetch('/api/cart', { credentials: 'same-origin' }))
+  return enqueueCartOperation(async () => readCartResponse(
+    await fetch('/api/cart', { credentials: 'same-origin' }),
+  ))
 }
 
 export async function addProductToCart(productId: number): Promise<ShoppingCart> {
-  return enqueueCartMutation(async () => readCartResponse(await fetch('/api/cart/items', {
+  return enqueueCartOperation(async () => readCartResponse(await fetch('/api/cart/items', {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...await csrfHeaders() },
@@ -60,7 +62,7 @@ export async function addProductToCart(productId: number): Promise<ShoppingCart>
 }
 
 export async function changeCartItemQuantity(itemId: number, quantity: number): Promise<ShoppingCart> {
-  return enqueueCartMutation(async () => readCartResponse(await fetch(`/api/cart/items/${itemId}`, {
+  return enqueueCartOperation(async () => readCartResponse(await fetch(`/api/cart/items/${itemId}`, {
     method: 'PUT',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...await csrfHeaders() },
@@ -69,7 +71,7 @@ export async function changeCartItemQuantity(itemId: number, quantity: number): 
 }
 
 export async function removeCartItem(itemId: number): Promise<ShoppingCart> {
-  return enqueueCartMutation(async () => readCartResponse(await fetch(`/api/cart/items/${itemId}`, {
+  return enqueueCartOperation(async () => readCartResponse(await fetch(`/api/cart/items/${itemId}`, {
     method: 'DELETE',
     credentials: 'same-origin',
     headers: await csrfHeaders(),

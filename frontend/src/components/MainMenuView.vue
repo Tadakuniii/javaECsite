@@ -28,6 +28,7 @@ const cartMessage = ref('')
 const cartError = ref('')
 const addingProductId = ref<number>()
 const cartOpenButton = ref<HTMLElement>()
+const headerCartButton = ref<HTMLButtonElement>()
 let cartMessageTimer: ReturnType<typeof setTimeout> | undefined
 const priceFormatter = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' })
 
@@ -68,7 +69,8 @@ const openCart = (event: Event) => {
 const closeCart = async () => {
   isCartOpen.value = false
   await nextTick()
-  cartOpenButton.value?.focus()
+  if (cartOpenButton.value?.isConnected) cartOpenButton.value.focus()
+  else headerCartButton.value?.focus()
   cartOpenButton.value = undefined
 }
 
@@ -138,7 +140,7 @@ const handleLogout = async () => {
       </div>
       <div class="account-menu">
         <p class="welcome-message">ようこそ、<strong>{{ username }}</strong> 様</p>
-        <button type="button" class="cart-button" aria-label="買い物カゴを開く" @click="openCart">
+        <button ref="headerCartButton" type="button" class="cart-button" aria-label="買い物カゴを開く" @click="openCart">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20 7H6"/><circle cx="10" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
           <span>カゴ</span><strong v-if="cart.totalQuantity">{{ cart.totalQuantity }}</strong>
         </button>
@@ -251,7 +253,7 @@ const handleLogout = async () => {
       </div>
     </dialog>
     <Teleport to="body">
-      <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" :products="products"
+      <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" :products="products" :external-error="cartError"
         @close="closeCart" @updated="cart = $event" @add="addToCart" />
     </Teleport>
   </div>
