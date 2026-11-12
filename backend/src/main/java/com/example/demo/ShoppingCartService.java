@@ -73,12 +73,12 @@ public class ShoppingCartService {
 
     private ShoppingCart findCart(String customerId) {
         return carts.findByCustomerCustomerId(customerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "買い物かごが見つかりません"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "買い物カゴが見つかりません"));
     }
 
     private CartItem findOwnedItem(ShoppingCart cart, long itemId) {
         return cartItems.findByIdAndCartId(itemId, cart.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "かごの商品が見つかりません"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "カゴの商品が見つかりません"));
     }
 
     private ShoppingCartResponse responseFor(long cartId) {

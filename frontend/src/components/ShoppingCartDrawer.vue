@@ -42,8 +42,8 @@ const removeItem = async (itemId: number) => {
   <div class="cart-backdrop" @click.self="emit('close')">
     <aside class="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title">
       <header class="cart-header">
-        <div><span class="cart-caption">SHOPPING CART</span><h2 id="cart-title">買い物かご</h2></div>
-        <button type="button" class="cart-close" aria-label="買い物かごを閉じる" @click="emit('close')">×</button>
+        <div><span class="cart-caption">SHOPPING CART</span><h2 id="cart-title">買い物カゴ</h2></div>
+        <button type="button" class="cart-close" aria-label="買い物カゴを閉じる" @click="emit('close')">×</button>
       </header>
       <div v-if="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
 
@@ -69,7 +69,7 @@ const removeItem = async (itemId: number) => {
       </div>
       <div v-else class="empty-cart">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20 7H6"/><circle cx="10" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
-        <h3>買い物かごは空です</h3><p>商品一覧から商品を追加してください。</p>
+        <h3>買い物カゴは空です</h3><p>商品一覧から商品を追加してください。</p>
       </div>
       <footer class="cart-footer">
         <div><span>合計（{{ cart.totalQuantity }}点）</span><strong>{{ yen.format(cart.totalPrice) }}</strong></div>

@@ -50,16 +50,16 @@ onMounted(async () => {
   }
 })
 
-/** 商品を1点追加し、ヘッダーのかご件数と内容を更新する。 */
+/** 商品を1点追加し、ヘッダーのカゴ件数と内容を更新する。 */
 const addToCart = async (product: HealthProduct) => {
   addingProductId.value = product.id
   cartError.value = ''
   cartMessage.value = ''
   try {
     cart.value = await addProductToCart(product.id)
-    cartMessage.value = `${product.name}を買い物かごに追加しました`
+    cartMessage.value = `${product.name}を買い物カゴに追加しました`
   } catch (error: unknown) {
-    cartError.value = error instanceof Error ? error.message : '買い物かごに追加できませんでした'
+    cartError.value = error instanceof Error ? error.message : '買い物カゴに追加できませんでした'
   } finally {
     addingProductId.value = undefined
   }
@@ -110,9 +110,9 @@ const handleLogout = async () => {
       </div>
       <div class="account-menu">
         <p class="welcome-message">ようこそ、<strong>{{ username }}</strong> 様</p>
-        <button type="button" class="cart-button" aria-label="買い物かごを開く" @click="isCartOpen = true">
+        <button type="button" class="cart-button" aria-label="買い物カゴを開く" @click="isCartOpen = true">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20 7H6"/><circle cx="10" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
-          <span>かご</span><strong v-if="cart.totalQuantity">{{ cart.totalQuantity }}</strong>
+          <span>カゴ</span><strong v-if="cart.totalQuantity">{{ cart.totalQuantity }}</strong>
         </button>
         <button v-if="administrator" type="button" class="logout-button" @click="emit('open-product-management')">
           商品管理
@@ -177,7 +177,7 @@ const handleLogout = async () => {
             <div class="product-actions">
               <button type="button" class="product-details-button" :aria-label="`${product.name}の詳細を見る`" @click="openProductDetails(product)">詳細を見る</button>
               <button type="button" class="add-cart-button" :disabled="addingProductId === product.id || product.stockQuantity === 0" @click="addToCart(product)">
-                {{ product.stockQuantity === 0 ? '在庫切れ' : addingProductId === product.id ? '追加中…' : '買い物かごに追加' }}
+                {{ product.stockQuantity === 0 ? '在庫切れ' : addingProductId === product.id ? '追加中…' : '買い物カゴに追加' }}
               </button>
             </div>
           </div>
@@ -208,7 +208,7 @@ const handleLogout = async () => {
         <dl class="product-specifications"><div><dt>内容量・サイズ</dt><dd>{{ selectedProduct.size }}</dd></div><div><dt>価格（税込）</dt><dd>{{ priceFormatter.format(selectedProduct.price) }}</dd></div></dl>
         <p class="sample-note">商品情報はサンプルです。</p>
         <button type="button" class="btn" :disabled="addingProductId === selectedProduct.id || selectedProduct.stockQuantity === 0" @click="addToCart(selectedProduct)">
-          {{ selectedProduct.stockQuantity === 0 ? '在庫切れ' : addingProductId === selectedProduct.id ? '追加中…' : '買い物かごに追加' }}
+          {{ selectedProduct.stockQuantity === 0 ? '在庫切れ' : addingProductId === selectedProduct.id ? '追加中…' : '買い物カゴに追加' }}
         </button>
         <button type="button" class="detail-back-button" @click="closeProductDetails">商品一覧に戻る</button>
       </div>

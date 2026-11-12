@@ -133,7 +133,7 @@ class ProductCatalogIntegrationTests {
     /** ログインユーザーが商品を追加し、数量変更と削除を行えることを検証する。 */
     @Test
     void shoppingCartKeepsItemsPerCustomerAndCalculatesTotals() throws Exception {
-        customers.save(new Customer("cart-customer", passwordEncoder.encode("password123"), "かご利用者"));
+        customers.save(new Customer("cart-customer", passwordEncoder.encode("password123"), "カゴ利用者"));
         customers.save(new Customer("other-customer", passwordEncoder.encode("password123"), "別の利用者"));
         Product product = products.findAllByActiveTrueOrderById().getFirst();
         String addJson = "{\"productId\":" + product.getId() + ",\"quantity\":1}";

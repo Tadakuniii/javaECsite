@@ -32,7 +32,7 @@ async function csrfHeaders(): Promise<Record<string, string>> {
 async function readCartResponse(response: Response): Promise<ShoppingCart> {
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { detail?: string; message?: string } | null
-    throw new Error(body?.detail || body?.message || '買い物かごを更新できませんでした')
+    throw new Error(body?.detail || body?.message || '買い物カゴを更新できませんでした')
   }
   return await response.json() as ShoppingCart
 }
