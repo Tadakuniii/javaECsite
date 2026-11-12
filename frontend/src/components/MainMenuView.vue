@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { submitAuthenticationForm } from '../services/authenticationApi'
 import { getAvailableProducts, type HealthProduct, type ProductCategory } from '../services/productApi'
 import { addProductToCart, emptyShoppingCart, getShoppingCart } from '../services/shoppingCartApi'
@@ -27,6 +27,7 @@ const isCartOpen = ref(false)
 const cartMessage = ref('')
 const cartError = ref('')
 const addingProductId = ref<number>()
+let cartMessageTimer: ReturnType<typeof setTimeout> | undefined
 const priceFormatter = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' })
 
 const visibleProducts = computed(() => {
@@ -58,12 +59,18 @@ const addToCart = async (product: HealthProduct) => {
   try {
     cart.value = await addProductToCart(product.id)
     cartMessage.value = `${product.name}を買い物カゴに追加しました`
+    if (cartMessageTimer) clearTimeout(cartMessageTimer)
+    cartMessageTimer = setTimeout(() => { cartMessage.value = '' }, 5000)
   } catch (error: unknown) {
     cartError.value = error instanceof Error ? error.message : '買い物カゴに追加できませんでした'
   } finally {
     addingProductId.value = undefined
   }
 }
+
+onBeforeUnmount(() => {
+  if (cartMessageTimer) clearTimeout(cartMessageTimer)
+})
 
 /** 選択商品の情報を表示し、ダイアログ内へフォーカスを移す。 */
 const openProductDetails = async (product: HealthProduct) => {
@@ -124,7 +131,14 @@ const handleLogout = async () => {
     </header>
     <div v-if="logoutError" class="alert alert-danger" role="alert">{{ logoutError }}</div>
     <div v-if="cartError" class="alert alert-danger" role="alert">{{ cartError }}</div>
-    <div v-if="cartMessage" class="alert alert-success" role="status">{{ cartMessage }}</div>
+    <Transition name="cart-toast">
+      <div v-if="cartMessage" class="cart-toast" role="status">
+        <span class="toast-check" aria-hidden="true">✓</span>
+        <div><strong>カゴに追加しました</strong><p>{{ cartMessage }}</p></div>
+        <button type="button" @click="isCartOpen = true; cartMessage = ''">カゴを見る</button>
+        <button type="button" class="toast-close" aria-label="通知を閉じる" @click="cartMessage = ''">×</button>
+      </div>
+    </Transition>
 
     <section class="welcome-card card" aria-labelledby="menu-title">
       <div class="welcome-copy">
@@ -230,6 +244,7 @@ const handleLogout = async () => {
 .logout-button:hover { border-color: var(--primary); color: var(--primary); }
 .logout-button:disabled { cursor: wait; opacity: 0.6; }
 .cart-button { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 8px 10px; border: 1px solid var(--input-border); border-radius: var(--radius-md); background: var(--card-bg); color: var(--text-primary); font: inherit; font-size: 12px; cursor: pointer; }.cart-button:hover { border-color: var(--primary); color: var(--primary); }.cart-button svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.7; }.cart-button strong { position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 5px; border-radius: 12px; background: var(--primary); color: white; font-size: 10px; }
+.cart-toast { position: fixed; z-index: 120; top: 24px; right: 24px; width: min(430px, calc(100% - 32px)); display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 15px 16px; border: 1px solid color-mix(in srgb, var(--success) 35%, transparent); border-radius: var(--radius-md); background: var(--card-bg); box-shadow: var(--shadow-lg); }.toast-check { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--success-bg); color: var(--success); font-weight: 700; }.cart-toast strong { display: block; color: var(--text-primary); font-size: 13px; }.cart-toast p { margin-top: 2px; font-size: 11px; line-height: 1.5; }.cart-toast > button:not(.toast-close) { padding: 8px 10px; border: 0; border-radius: 7px; background: var(--primary); color: white; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }.toast-close { border: 0; background: transparent; color: var(--text-secondary); font-size: 20px; cursor: pointer; }.cart-toast-enter-active, .cart-toast-leave-active { transition: opacity .2s ease, transform .2s ease; }.cart-toast-enter-from, .cart-toast-leave-to { opacity: 0; transform: translateY(-12px); }
 .welcome-card { display: grid; grid-template-columns: 1.4fr 1fr; align-items: center; padding: 44px 48px; overflow: hidden; background: linear-gradient(115deg, var(--card-bg), var(--primary-glow)); }
 .welcome-card:hover { transform: none; }
 .section-label { display: block; color: var(--primary); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; margin-bottom: 12px; }
@@ -310,6 +325,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--primary); outli
   .product-grid { grid-template-columns: 1fr; gap: 18px; }
   .product-art { height: 210px; }.product-content { padding: 20px; }
   .menu-footer { flex-direction: column; gap: 6px; }.sample-note { line-height: 1.8; }
+  .cart-toast { top: 12px; right: 16px; grid-template-columns: auto 1fr auto; }.cart-toast > button:not(.toast-close) { grid-column: 2 / 3; }.toast-close { grid-column: 3; grid-row: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .product-card { transition: none; }.product-card:hover { transform: none; } }
 </style>
