@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { submitAuthenticationForm } from '../services/authenticationApi'
 import { getAvailableProducts, type HealthProduct, type ProductCategory } from '../services/productApi'
 import { addProductToCart, emptyShoppingCart, getShoppingCart } from '../services/shoppingCartApi'
@@ -29,8 +29,17 @@ const cartError = ref('')
 const addingProductId = ref<number>()
 const cartOpenButton = ref<HTMLElement>()
 const headerCartButton = ref<HTMLButtonElement>()
+const cartToast = ref<HTMLElement>()
 let cartMessageTimer: ReturnType<typeof setTimeout> | undefined
 const priceFormatter = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' })
+
+watch(cartMessage, async message => {
+  await nextTick()
+  const toast = cartToast.value
+  if (!toast) return
+  if (message && !toast.matches(':popover-open')) toast.showPopover()
+  else if (!message && toast.matches(':popover-open')) toast.hidePopover()
+})
 
 const visibleProducts = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase('ja-JP')
@@ -155,14 +164,12 @@ const handleLogout = async () => {
     <div v-if="logoutError" class="alert alert-danger" role="alert">{{ logoutError }}</div>
     <div v-if="cartError" class="alert alert-danger" role="alert">{{ cartError }}</div>
     <Teleport to="body">
-      <Transition name="cart-toast">
-        <div v-if="cartMessage" class="cart-toast" role="status">
+        <div ref="cartToast" class="cart-toast" role="status" popover="manual">
           <span class="toast-check" aria-hidden="true">✓</span>
           <div><strong>カゴに追加しました</strong><p>{{ cartMessage }}</p></div>
           <button type="button" @click="openCart($event); cartMessage = ''">カゴを見る</button>
           <button type="button" class="toast-close" aria-label="通知を閉じる" @click="cartMessage = ''">×</button>
         </div>
-      </Transition>
     </Teleport>
 
     <section class="welcome-card card" aria-labelledby="menu-title">
@@ -272,7 +279,7 @@ const handleLogout = async () => {
 .logout-button:hover { border-color: var(--primary); color: var(--primary); }
 .logout-button:disabled { cursor: wait; opacity: 0.6; }
 .cart-button { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 8px 10px; border: 1px solid var(--input-border); border-radius: var(--radius-md); background: var(--card-bg); color: var(--text-primary); font: inherit; font-size: 12px; cursor: pointer; }.cart-button:hover { border-color: var(--primary); color: var(--primary); }.cart-button svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.7; }.cart-button strong { position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 5px; border-radius: 12px; background: var(--primary); color: white; font-size: 10px; }
-.cart-toast { position: fixed; z-index: 120; top: 24px; right: 24px; width: min(430px, calc(100% - 32px)); display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 15px 16px; border: 1px solid color-mix(in srgb, var(--success) 35%, transparent); border-radius: var(--radius-md); background: var(--card-bg); box-shadow: var(--shadow-lg); }.toast-check { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--success-bg); color: var(--success); font-weight: 700; }.cart-toast strong { display: block; color: var(--text-primary); font-size: 13px; }.cart-toast p { margin-top: 2px; font-size: 11px; line-height: 1.5; }.cart-toast > button:not(.toast-close) { padding: 8px 10px; border: 0; border-radius: 7px; background: var(--primary); color: white; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }.toast-close { border: 0; background: transparent; color: var(--text-secondary); font-size: 20px; cursor: pointer; }.cart-toast-enter-active, .cart-toast-leave-active { transition: opacity .2s ease, transform .2s ease; }.cart-toast-enter-from, .cart-toast-leave-to { opacity: 0; transform: translateY(-12px); }
+.cart-toast { position: fixed; z-index: 120; inset: 24px 24px auto auto; margin: 0; width: min(430px, calc(100% - 32px)); grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 15px 16px; border: 1px solid color-mix(in srgb, var(--success) 35%, transparent); border-radius: var(--radius-md); background: var(--card-bg); color: var(--text-primary); box-shadow: var(--shadow-lg); }.cart-toast:popover-open { display: grid; }.toast-check { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--success-bg); color: var(--success); font-weight: 700; }.cart-toast strong { display: block; color: var(--text-primary); font-size: 13px; }.cart-toast p { margin-top: 2px; font-size: 11px; line-height: 1.5; }.cart-toast > button:not(.toast-close) { padding: 8px 10px; border: 0; border-radius: 7px; background: var(--primary); color: white; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }.toast-close { border: 0; background: transparent; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
 .welcome-card { display: grid; grid-template-columns: 1.4fr 1fr; align-items: center; padding: 44px 48px; overflow: hidden; background: linear-gradient(115deg, var(--card-bg), var(--primary-glow)); }
 .welcome-card:hover { transform: none; }
 .section-label { display: block; color: var(--primary); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; margin-bottom: 12px; }
