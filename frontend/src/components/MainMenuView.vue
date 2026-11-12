@@ -2,8 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { submitAuthenticationForm } from '../services/authenticationApi'
 import { getAvailableProducts, type HealthProduct, type ProductCategory } from '../services/productApi'
-import { addProductToCart, emptyShoppingCart, getShoppingCart } from '../services/shoppingCartApi'
-import { checkoutShoppingCart } from '../services/orderApi'
+import { addProductToCart, checkoutShoppingCart, emptyShoppingCart, getShoppingCart } from '../services/shoppingCartApi'
 import ProductIllustration from './ProductIllustration.vue'
 import ShoppingCartDrawer from './ShoppingCartDrawer.vue'
 
@@ -105,6 +104,7 @@ const addToCart = async (product: HealthProduct) => {
 
 /** カゴの内容を注文として確定し、注文履歴画面へ移動する。 */
 const checkout = async () => {
+  if (isCheckingOut.value) return
   cartError.value = ''
   isCheckingOut.value = true
   try {

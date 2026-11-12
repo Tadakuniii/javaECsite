@@ -22,13 +22,6 @@ export interface CustomerOrder {
   items: OrderHistoryItem[]
 }
 
-async function csrfHeaders(): Promise<Record<string, string>> {
-  const response = await fetch('/api/csrf', { credentials: 'same-origin' })
-  if (!response.ok) throw new Error('接続を確認してください')
-  const csrf = await response.json() as { token: string; headerName: string }
-  return { [csrf.headerName]: csrf.token }
-}
-
 async function readResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { detail?: string; message?: string } | null
@@ -42,12 +35,4 @@ export async function getOrderHistory(): Promise<CustomerOrder[]> {
     await fetch('/api/orders', { credentials: 'same-origin' }),
     '注文履歴を取得できませんでした',
   )
-}
-
-export async function checkoutShoppingCart(): Promise<CustomerOrder> {
-  return readResponse<CustomerOrder>(await fetch('/api/orders', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: await csrfHeaders(),
-  }), '購入手続きを完了できませんでした')
 }

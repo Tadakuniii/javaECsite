@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, mock, test } from 'node:test'
-import { checkoutShoppingCart, getOrderHistory } from '../src/services/orderApi.ts'
+import { getOrderHistory } from '../src/services/orderApi.ts'
+import { addProductToCart, checkoutShoppingCart } from '../src/services/shoppingCartApi.ts'
 
 afterEach(() => mock.restoreAll())
 
@@ -29,4 +30,28 @@ test('ログイン中の利用者の注文履歴を取得する', async () => {
   mock.method(globalThis, 'fetch', async () => jsonResponse([{ id: 2, status: 'PAID', items: [] }]))
   const orders = await getOrderHistory()
   assert.equal(orders[0]?.id, 2)
+})
+
+test('商品の追加が完了してから購入処理を開始する', async () => {
+  const requestedPaths: string[] = []
+  let finishCartUpdate: ((response: Response) => void) | undefined
+  mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    const path = String(input)
+    requestedPaths.push(path)
+    if (path === '/api/csrf') return jsonResponse({ token: 'order-token', headerName: 'X-CSRF-TOKEN' })
+    if (path === '/api/cart/items') {
+      return await new Promise<Response>(resolve => { finishCartUpdate = resolve })
+    }
+    return jsonResponse({ id: 3, status: 'PAID', items: [] })
+  })
+
+  const adding = addProductToCart(1)
+  const checkout = checkoutShoppingCart()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(requestedPaths, ['/api/csrf', '/api/cart/items'])
+
+  finishCartUpdate?.(jsonResponse({ items: [{ id: 1 }], totalQuantity: 1, totalPrice: 100 }))
+  await adding
+  assert.equal((await checkout).id, 3)
+  assert.deepEqual(requestedPaths, ['/api/csrf', '/api/cart/items', '/api/csrf', '/api/orders'])
 })
