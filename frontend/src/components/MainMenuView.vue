@@ -2,7 +2,9 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { submitAuthenticationForm } from '../services/authenticationApi'
 import { getAvailableProducts, type HealthProduct, type ProductCategory } from '../services/productApi'
+import { addProductToCart, emptyShoppingCart, getShoppingCart } from '../services/shoppingCartApi'
 import ProductIllustration from './ProductIllustration.vue'
+import ShoppingCartDrawer from './ShoppingCartDrawer.vue'
 
 defineProps<{ username: string; administrator: boolean }>()
 const emit = defineEmits<{
@@ -20,6 +22,11 @@ const failedProductImageIds = ref<Set<number>>(new Set())
 const productDialog = ref<HTMLDialogElement | null>(null)
 const logoutError = ref('')
 const isLoggingOut = ref(false)
+const cart = ref(emptyShoppingCart())
+const isCartOpen = ref(false)
+const cartMessage = ref('')
+const cartError = ref('')
+const addingProductId = ref<number>()
 const priceFormatter = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' })
 
 const visibleProducts = computed(() => {
@@ -33,13 +40,30 @@ const visibleProducts = computed(() => {
 /** ログイン後にDBから販売中の商品を読み込む。 */
 onMounted(async () => {
   try {
-    products.value = await getAvailableProducts()
+    const [availableProducts, shoppingCart] = await Promise.all([getAvailableProducts(), getShoppingCart()])
+    products.value = availableProducts
+    cart.value = shoppingCart
   } catch (error: unknown) {
     productLoadingError.value = error instanceof Error ? error.message : '商品情報を取得できませんでした'
   } finally {
     isLoadingProducts.value = false
   }
 })
+
+/** 商品を1点追加し、ヘッダーのかご件数と内容を更新する。 */
+const addToCart = async (product: HealthProduct) => {
+  addingProductId.value = product.id
+  cartError.value = ''
+  cartMessage.value = ''
+  try {
+    cart.value = await addProductToCart(product.id)
+    cartMessage.value = `${product.name}を買い物かごに追加しました`
+  } catch (error: unknown) {
+    cartError.value = error instanceof Error ? error.message : '買い物かごに追加できませんでした'
+  } finally {
+    addingProductId.value = undefined
+  }
+}
 
 /** 選択商品の情報を表示し、ダイアログ内へフォーカスを移す。 */
 const openProductDetails = async (product: HealthProduct) => {
@@ -86,6 +110,10 @@ const handleLogout = async () => {
       </div>
       <div class="account-menu">
         <p class="welcome-message">ようこそ、<strong>{{ username }}</strong> 様</p>
+        <button type="button" class="cart-button" aria-label="買い物かごを開く" @click="isCartOpen = true">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20 7H6"/><circle cx="10" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
+          <span>かご</span><strong v-if="cart.totalQuantity">{{ cart.totalQuantity }}</strong>
+        </button>
         <button v-if="administrator" type="button" class="logout-button" @click="emit('open-product-management')">
           商品管理
         </button>
@@ -95,6 +123,8 @@ const handleLogout = async () => {
       </div>
     </header>
     <div v-if="logoutError" class="alert alert-danger" role="alert">{{ logoutError }}</div>
+    <div v-if="cartError" class="alert alert-danger" role="alert">{{ cartError }}</div>
+    <div v-if="cartMessage" class="alert alert-success" role="status">{{ cartMessage }}</div>
 
     <section class="welcome-card card" aria-labelledby="menu-title">
       <div class="welcome-copy">
@@ -144,9 +174,12 @@ const handleLogout = async () => {
             <h3>{{ product.name }}</h3>
             <p class="product-size">{{ product.size }}</p>
             <div class="product-bottom"><p class="product-price">{{ priceFormatter.format(product.price) }}<span>（税込）</span></p></div>
-            <button type="button" class="product-details-button" :aria-label="`${product.name}の詳細を見る`" @click="openProductDetails(product)">
-              詳細を見る <span aria-hidden="true">→</span>
-            </button>
+            <div class="product-actions">
+              <button type="button" class="product-details-button" :aria-label="`${product.name}の詳細を見る`" @click="openProductDetails(product)">詳細を見る</button>
+              <button type="button" class="add-cart-button" :disabled="addingProductId === product.id || product.stockQuantity === 0" @click="addToCart(product)">
+                {{ product.stockQuantity === 0 ? '在庫切れ' : addingProductId === product.id ? '追加中…' : '買い物かごに追加' }}
+              </button>
+            </div>
           </div>
         </article>
       </div>
@@ -156,7 +189,7 @@ const handleLogout = async () => {
         <button type="button" class="btn btn-secondary" @click="resetProductFilters">絞り込みを解除</button>
       </div>
       </template>
-      <p class="sample-note">掲載商品・価格はサンプルです。現在は商品情報の閲覧のみご利用いただけます。</p>
+      <p class="sample-note">掲載商品・価格はサンプルです。</p>
     </section>
     <footer class="menu-footer">Web Shop <span>毎日の暮らしに、健やかな選択を。</span></footer>
 
@@ -174,9 +207,13 @@ const handleLogout = async () => {
         <p class="detail-description">{{ selectedProduct.description }}</p>
         <dl class="product-specifications"><div><dt>内容量・サイズ</dt><dd>{{ selectedProduct.size }}</dd></div><div><dt>価格（税込）</dt><dd>{{ priceFormatter.format(selectedProduct.price) }}</dd></div></dl>
         <p class="sample-note">商品情報はサンプルです。</p>
-        <button type="button" class="btn" @click="closeProductDetails">商品一覧に戻る</button>
+        <button type="button" class="btn" :disabled="addingProductId === selectedProduct.id || selectedProduct.stockQuantity === 0" @click="addToCart(selectedProduct)">
+          {{ selectedProduct.stockQuantity === 0 ? '在庫切れ' : addingProductId === selectedProduct.id ? '追加中…' : '買い物かごに追加' }}
+        </button>
+        <button type="button" class="detail-back-button" @click="closeProductDetails">商品一覧に戻る</button>
       </div>
     </dialog>
+    <ShoppingCartDrawer v-if="isCartOpen" :cart="cart" @close="isCartOpen = false" @updated="cart = $event" />
   </div>
 </template>
 
@@ -192,6 +229,7 @@ const handleLogout = async () => {
 .logout-button { padding: 9px 14px; background: var(--card-bg); border: 1px solid var(--input-border); border-radius: var(--radius-md); color: var(--text-primary); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .logout-button:hover { border-color: var(--primary); color: var(--primary); }
 .logout-button:disabled { cursor: wait; opacity: 0.6; }
+.cart-button { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 8px 10px; border: 1px solid var(--input-border); border-radius: var(--radius-md); background: var(--card-bg); color: var(--text-primary); font: inherit; font-size: 12px; cursor: pointer; }.cart-button:hover { border-color: var(--primary); color: var(--primary); }.cart-button svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.7; }.cart-button strong { position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 5px; border-radius: 12px; background: var(--primary); color: white; font-size: 10px; }
 .welcome-card { display: grid; grid-template-columns: 1.4fr 1fr; align-items: center; padding: 44px 48px; overflow: hidden; background: linear-gradient(115deg, var(--card-bg), var(--primary-glow)); }
 .welcome-card:hover { transform: none; }
 .section-label { display: block; color: var(--primary); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; margin-bottom: 12px; }
@@ -231,7 +269,7 @@ const handleLogout = async () => {
 .product-size { font-size: 12px; margin-top: 6px; }
 .product-price { font-size: 22px; color: var(--text-primary); font-weight: 600; margin-top: 18px; }
 .product-price span { font-size: 10px; color: var(--text-secondary); font-weight: 400; margin-left: 6px; }
-.product-details-button { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 16px; padding: 11px 14px; border: 1px solid var(--input-border); border-radius: var(--radius-md); color: var(--primary); background: transparent; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.product-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 8px; margin-top: 16px; }.product-details-button, .add-cart-button { width: 100%; padding: 11px 8px; border: 1px solid var(--input-border); border-radius: var(--radius-md); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }.product-details-button { color: var(--primary); background: transparent; }.add-cart-button { color: white; background: var(--primary); border-color: var(--primary); }.add-cart-button:hover { background: var(--primary-hover); }.add-cart-button:disabled { cursor: wait; opacity: .55; }
 .product-details-button:hover { background: var(--primary-glow); border-color: var(--primary); }
 .empty-products { text-align: center; padding: 40px 20px; }
 .empty-products h3 { font-size: 17px; margin-bottom: 12px; }.empty-products p { font-size: 13px; }
@@ -250,6 +288,7 @@ const handleLogout = async () => {
 .product-specifications div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--input-border); padding: 12px 0; }
 .product-specifications dt { color: var(--text-secondary); }
 .dialog-content .btn { margin-top: 20px; font-size: 13px; }
+.detail-back-button { width: 100%; margin-top: 8px; padding: 10px; border: 0; background: transparent; color: var(--primary); cursor: pointer; }
 button:focus-visible, a:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
 @media (max-width: 900px) {
   .welcome-card { padding: 32px; grid-template-columns: 1.4fr 1fr; }

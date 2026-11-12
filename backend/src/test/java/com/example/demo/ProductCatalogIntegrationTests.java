@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -127,6 +128,41 @@ class ProductCatalogIntegrationTests {
                 .andExpect(jsonPath("$.active").value(false));
         api.perform(get("/api/products").with(user("customer")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("テスト青汁 改良版"))));
+    }
+
+    /** ログインユーザーが商品を追加し、数量変更と削除を行えることを検証する。 */
+    @Test
+    void shoppingCartKeepsItemsPerCustomerAndCalculatesTotals() throws Exception {
+        customers.save(new Customer("cart-customer", passwordEncoder.encode("password123"), "かご利用者"));
+        customers.save(new Customer("other-customer", passwordEncoder.encode("password123"), "別の利用者"));
+        Product product = products.findAllByActiveTrueOrderById().getFirst();
+        String addJson = "{\"productId\":" + product.getId() + ",\"quantity\":1}";
+
+        api.perform(post("/api/cart/items")
+                        .with(user("cart-customer")).with(csrf())
+                        .contentType("application/json").content(addJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalQuantity").value(1))
+                .andExpect(jsonPath("$.totalPrice").value(product.getPrice()))
+                .andExpect(jsonPath("$.items[0].name").value(product.getName()))
+                .andReturn();
+        ShoppingCart createdCart = carts.findByCustomerCustomerId("cart-customer").orElseThrow();
+        long itemId = cartItems.findAllByCartIdOrderById(createdCart.getId()).getFirst().getId();
+
+        api.perform(put("/api/cart/items/{itemId}", itemId)
+                        .with(user("cart-customer")).with(csrf())
+                        .contentType("application/json").content("{\"quantity\":3}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalQuantity").value(3))
+                .andExpect(jsonPath("$.totalPrice").value(product.getPrice() * 3));
+        api.perform(delete("/api/cart/items/{itemId}", itemId)
+                        .with(user("other-customer")).with(csrf()))
+                .andExpect(status().isNotFound());
+        api.perform(delete("/api/cart/items/{itemId}", itemId)
+                        .with(user("cart-customer")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalQuantity").value(0));
     }
 
     /** カート関連と注文時の商品情報の保存を検証する。 */
