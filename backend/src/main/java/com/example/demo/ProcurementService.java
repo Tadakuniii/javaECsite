@@ -29,8 +29,11 @@ public class ProcurementService {
 
     @Transactional
     public PurchaseOrderResponse createManualOrder(PurchaseOrderRequest request) {
-        Product product = products.findById(request.productId())
+        Product product = products.findByIdForOrder(request.productId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
+        if (request.expectedDeliveryDate().isBefore(LocalDate.now(clock))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "納期は今日以降の日付を指定してください");
+        }
         PurchaseOrder order = new PurchaseOrder(product, request.supplierName().strip(),
                 request.expectedDeliveryDate(), request.unitCost(), request.quantity(), false,
                 LocalDateTime.now(clock));

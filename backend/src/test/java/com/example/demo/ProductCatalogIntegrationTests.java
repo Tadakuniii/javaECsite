@@ -251,6 +251,14 @@ class ProductCatalogIntegrationTests {
                 .andExpect(jsonPath("$.quantity").value(4))
                 .andExpect(jsonPath("$.automatic").value(false));
 
+        String pastDeliveryDateJson = """
+                {"productId":%d,"supplierName":"期限切れテスト商事","expectedDeliveryDate":"%s",
+                 "unitCost":500,"quantity":4}
+                """.formatted(manuallyOrderedProduct.getId(), java.time.LocalDate.now().minusDays(1));
+        api.perform(post("/api/admin/procurements").with(user("admin").roles("ADMIN")).with(csrf())
+                        .contentType("application/json").content(pastDeliveryDateJson))
+                .andExpect(status().isBadRequest());
+
         api.perform(post("/api/cart/items").with(user(customerId)).with(csrf())
                         .contentType("application/json")
                         .content("{\"productId\":" + product.getId() + ",\"quantity\":1}"))
