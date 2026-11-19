@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, mock, test } from 'node:test'
 import { getOrderHistory } from '../src/services/orderApi.ts'
-import { addProductToCart, checkoutShoppingCart } from '../src/services/shoppingCartApi.ts'
+import { addProductToCart, changeCartItemQuantity, checkoutShoppingCart } from '../src/services/shoppingCartApi.ts'
 
 afterEach(() => mock.restoreAll())
 
@@ -54,4 +54,26 @@ test('商品の追加が完了してから購入処理を開始する', async ()
   await adding
   assert.equal((await checkout).id, 3)
   assert.deepEqual(requestedPaths, ['/api/csrf', '/api/cart/items', '/api/csrf', '/api/orders'])
+})
+
+test('直前のカゴ更新が失敗した場合は古い内容で購入しない', async () => {
+  const requestedPaths: string[] = []
+  mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    const path = String(input)
+    requestedPaths.push(path)
+    if (path === '/api/csrf') return jsonResponse({ token: 'order-token', headerName: 'X-CSRF-TOKEN' })
+    if (path === '/api/cart/items/1') return jsonResponse({ detail: '在庫数を超えて追加できません' }, 400)
+    if (path === '/api/cart/items') return jsonResponse({ items: [{ id: 1 }], totalQuantity: 1, totalPrice: 100 })
+    return jsonResponse({ id: 4, status: 'PAID', items: [] })
+  })
+
+  await assert.rejects(changeCartItemQuantity(1, 2), /在庫数を超えて追加できません/)
+  await assert.rejects(checkoutShoppingCart(), /カゴの更新に失敗しているため購入できません/)
+  assert.deepEqual(requestedPaths, ['/api/csrf', '/api/cart/items/1'])
+
+  await addProductToCart(1)
+  assert.equal((await checkoutShoppingCart()).id, 4)
+  assert.deepEqual(requestedPaths, [
+    '/api/csrf', '/api/cart/items/1', '/api/csrf', '/api/cart/items', '/api/csrf', '/api/orders',
+  ])
 })

@@ -130,7 +130,7 @@ const addRecommendedProduct = (product: HealthProduct) => {
       </div>
       <footer class="cart-footer">
         <div><span>合計（{{ cart.totalQuantity }}点）</span><strong>{{ yen.format(cart.totalPrice) }}</strong></div>
-        <button type="button" class="btn" :disabled="!cart.items.length || checkingOut" @click="emit('checkout')">
+        <button type="button" class="btn" :disabled="!cart.items.length || checkingOut || updatingItemId !== undefined" @click="emit('checkout')">
           {{ checkingOut ? '購入処理中…' : '購入手続きへ' }}
         </button>
         <button type="button" class="continue-button" @click="emit('close')">買い物を続ける</button>

@@ -24,12 +24,27 @@ export interface ShoppingCart {
 export const emptyShoppingCart = (): ShoppingCart => ({ items: [], totalQuantity: 0, totalPrice: 0 })
 
 let cartOperationQueue: Promise<void> = Promise.resolve()
+let latestCartMutationError: unknown
 
 /** カゴの取得と更新を順番に実行し、古い応答による表示の巻き戻りを防ぐ。 */
 function enqueueCartOperation<T>(operation: () => Promise<T>): Promise<T> {
   const result = cartOperationQueue.then(operation, operation)
   cartOperationQueue = result.then(() => undefined, () => undefined)
   return result
+}
+
+/** 更新失敗を記録し、成功するまで古いカゴ内容での購入を防ぐ。 */
+function enqueueCartMutation(operation: () => Promise<ShoppingCart>): Promise<ShoppingCart> {
+  return enqueueCartOperation(async () => {
+    try {
+      const updatedCart = await operation()
+      latestCartMutationError = undefined
+      return updatedCart
+    } catch (error: unknown) {
+      latestCartMutationError = error
+      throw error
+    }
+  })
 }
 
 async function csrfHeaders(): Promise<Record<string, string>> {
@@ -54,7 +69,7 @@ export async function getShoppingCart(): Promise<ShoppingCart> {
 }
 
 export async function addProductToCart(productId: number): Promise<ShoppingCart> {
-  return enqueueCartOperation(async () => readCartResponse(await fetch('/api/cart/items', {
+  return enqueueCartMutation(async () => readCartResponse(await fetch('/api/cart/items', {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...await csrfHeaders() },
@@ -63,7 +78,7 @@ export async function addProductToCart(productId: number): Promise<ShoppingCart>
 }
 
 export async function changeCartItemQuantity(itemId: number, quantity: number): Promise<ShoppingCart> {
-  return enqueueCartOperation(async () => readCartResponse(await fetch(`/api/cart/items/${itemId}`, {
+  return enqueueCartMutation(async () => readCartResponse(await fetch(`/api/cart/items/${itemId}`, {
     method: 'PUT',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...await csrfHeaders() },
@@ -72,7 +87,7 @@ export async function changeCartItemQuantity(itemId: number, quantity: number): 
 }
 
 export async function removeCartItem(itemId: number): Promise<ShoppingCart> {
-  return enqueueCartOperation(async () => readCartResponse(await fetch(`/api/cart/items/${itemId}`, {
+  return enqueueCartMutation(async () => readCartResponse(await fetch(`/api/cart/items/${itemId}`, {
     method: 'DELETE',
     credentials: 'same-origin',
     headers: await csrfHeaders(),
@@ -82,6 +97,9 @@ export async function removeCartItem(itemId: number): Promise<ShoppingCart> {
 /** 未完了のカゴ更新を待ってから、現在の内容を注文として確定する。 */
 export async function checkoutShoppingCart(): Promise<CustomerOrder> {
   return enqueueCartOperation(async () => {
+    if (latestCartMutationError) {
+      throw new Error('カゴの更新に失敗しているため購入できません。カゴの内容を確認して、もう一度操作してください')
+    }
     const response = await fetch('/api/orders', {
       method: 'POST',
       credentials: 'same-origin',
