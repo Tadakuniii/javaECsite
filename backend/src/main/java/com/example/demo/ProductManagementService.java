@@ -30,19 +30,19 @@ public class ProductManagementService {
                 "#7881b9", "bottle");
         applyEditableValues(product, request);
         Product saved = products.save(product);
-        procurement.createAutomaticOrderIfNeeded(saved);
+        procurement.createAutomaticOrderIfNeeded(saved.getId());
         return ManagedProductResponse.from(saved);
     }
 
     /** 指定された既存商品の編集可能項目を更新する。 */
     @Transactional
     public ManagedProductResponse update(long productId, ProductManagementRequest request) {
-        Product product = products.findById(productId)
+        Product product = products.findByIdForOrder(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
         product.setCategory(findCategory(request.category()));
         applyEditableValues(product, request);
         Product saved = products.save(product);
-        procurement.createAutomaticOrderIfNeeded(saved);
+        procurement.createAutomaticOrderIfNeeded(saved.getId());
         return ManagedProductResponse.from(saved);
     }
 

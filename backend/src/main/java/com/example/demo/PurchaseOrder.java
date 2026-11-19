@@ -11,7 +11,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -64,7 +63,7 @@ public class PurchaseOrder {
     protected PurchaseOrder() {}
 
     public PurchaseOrder(Product product, String supplierName, LocalDate expectedDeliveryDate,
-                         int unitCost, int quantity, boolean automatic) {
+                         int unitCost, int quantity, boolean automatic, LocalDateTime orderedAt) {
         this.product = product;
         this.productName = product.getName();
         this.supplierName = supplierName;
@@ -72,10 +71,6 @@ public class PurchaseOrder {
         this.unitCost = unitCost;
         this.quantity = quantity;
         this.automatic = automatic;
-    }
-
-    @PrePersist
-    void recordOrderTime() {
-        if (orderedAt == null) orderedAt = LocalDateTime.now();
+        this.orderedAt = orderedAt;
     }
 }

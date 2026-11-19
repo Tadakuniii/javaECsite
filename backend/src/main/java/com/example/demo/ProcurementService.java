@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,10 +13,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class ProcurementService {
     private final PurchaseOrderRepository purchaseOrders;
     private final ProductRepository products;
+    private final Clock clock;
 
-    public ProcurementService(PurchaseOrderRepository purchaseOrders, ProductRepository products) {
+    public ProcurementService(PurchaseOrderRepository purchaseOrders, ProductRepository products, Clock clock) {
         this.purchaseOrders = purchaseOrders;
         this.products = products;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -29,19 +32,23 @@ public class ProcurementService {
         Product product = products.findById(request.productId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
         PurchaseOrder order = new PurchaseOrder(product, request.supplierName().strip(),
-                request.expectedDeliveryDate(), request.unitCost(), request.quantity(), false);
+                request.expectedDeliveryDate(), request.unitCost(), request.quantity(), false,
+                LocalDateTime.now(clock));
         return PurchaseOrderResponse.from(purchaseOrders.save(order));
     }
 
     /** 基準在庫以下で、未入荷の発注がない商品に自動発注を作成する。 */
     @Transactional
-    public void createAutomaticOrderIfNeeded(Product product) {
+    public void createAutomaticOrderIfNeeded(long productId) {
+        Product product = products.findByIdForOrder(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
         if (!product.isAutoOrderEnabled() || product.getStockQuantity() > product.getReorderThreshold()) return;
         if (purchaseOrders.existsByProductIdAndStatus(product.getId(), PurchaseOrderStatus.ORDERED)) return;
         validateAutomaticOrderSettings(product);
         purchaseOrders.save(new PurchaseOrder(product, product.getDefaultSupplierName().strip(),
-                LocalDate.now().plusDays(product.getDefaultLeadTimeDays()),
-                product.getDefaultOrderUnitCost(), product.getReorderQuantity(), true));
+                LocalDate.now(clock).plusDays(product.getDefaultLeadTimeDays()),
+                product.getDefaultOrderUnitCost(), product.getReorderQuantity(), true,
+                LocalDateTime.now(clock)));
     }
 
     @Transactional
@@ -55,10 +62,10 @@ public class ProcurementService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
         product.setStockQuantity(Math.addExact(product.getStockQuantity(), order.getQuantity()));
         order.setStatus(PurchaseOrderStatus.RECEIVED);
-        order.setReceivedAt(LocalDateTime.now());
+        order.setReceivedAt(LocalDateTime.now(clock));
         products.save(product);
         PurchaseOrder saved = purchaseOrders.save(order);
-        createAutomaticOrderIfNeeded(product);
+        createAutomaticOrderIfNeeded(product.getId());
         return PurchaseOrderResponse.from(saved);
     }
 

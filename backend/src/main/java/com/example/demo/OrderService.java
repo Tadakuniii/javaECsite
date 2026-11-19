@@ -75,7 +75,8 @@ public class OrderService {
             return new OrderItem(order, product, item.getQuantity());
         }).toList();
         products.saveAll(currentItems.stream().map(CartItem::getProduct).toList());
-        currentItems.stream().map(CartItem::getProduct).forEach(procurement::createAutomaticOrderIfNeeded);
+        currentItems.stream().map(CartItem::getProduct).map(Product::getId)
+                .forEach(procurement::createAutomaticOrderIfNeeded);
         orderItems.saveAll(purchasedItems);
         cartItems.deleteAll(currentItems);
         cartItems.flush();

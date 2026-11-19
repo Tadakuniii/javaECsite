@@ -58,10 +58,16 @@ const receiveOrder = async (order: PurchaseOrder) => {
   receivingOrderId.value = order.id
   try {
     const received = await receivePurchaseOrder(order.id)
-    orders.value = await getPurchaseOrders()
+    const orderIndex = orders.value.findIndex(item => item.id === received.id)
+    if (orderIndex >= 0) orders.value[orderIndex] = received
     const product = products.value.find(item => item.id === received.productId)
     if (product) product.stockQuantity += received.quantity
     successMessage.value = `${received.productName}の入荷を在庫へ反映しました`
+    try {
+      orders.value = await getPurchaseOrders()
+    } catch {
+      errorMessage.value = '入荷は反映されましたが、最新の発注履歴を再取得できませんでした'
+    }
   } catch (error: unknown) {
     errorMessage.value = error instanceof Error ? error.message : '入荷を登録できませんでした'
   } finally { receivingOrderId.value = undefined }
