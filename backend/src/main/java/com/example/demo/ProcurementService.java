@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ProcurementService {
+    private static final LocalDate MYSQL_MAX_DATE = LocalDate.of(9999, 12, 31);
     private final PurchaseOrderRepository purchaseOrders;
     private final ProductRepository products;
     private final Clock clock;
@@ -46,10 +47,11 @@ public class ProcurementService {
         Product product = products.findByIdForOrder(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
         if (!product.isAutoOrderEnabled() || product.getStockQuantity() > product.getReorderThreshold()) return;
-        if (purchaseOrders.existsByProductIdAndStatus(product.getId(), PurchaseOrderStatus.ORDERED)) return;
+        if (!purchaseOrders.findByProductIdAndStatusForUpdate(
+                product.getId(), PurchaseOrderStatus.ORDERED).isEmpty()) return;
         validateAutomaticOrderSettings(product);
         purchaseOrders.save(new PurchaseOrder(product, product.getDefaultSupplierName().strip(),
-                LocalDate.now(clock).plusDays(product.getDefaultLeadTimeDays()),
+                calculateExpectedDeliveryDate(product.getDefaultLeadTimeDays()),
                 product.getDefaultOrderUnitCost(), product.getReorderQuantity(), true,
                 LocalDateTime.now(clock)));
     }
@@ -80,5 +82,14 @@ public class ProcurementService {
         if (product.getReorderQuantity() < 1 || product.getDefaultLeadTimeDays() < 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "自動発注の発注数と納期日数は1以上にしてください");
         }
+        calculateExpectedDeliveryDate(product.getDefaultLeadTimeDays());
+    }
+
+    private LocalDate calculateExpectedDeliveryDate(int leadTimeDays) {
+        LocalDate expectedDeliveryDate = LocalDate.now(clock).plusDays(leadTimeDays);
+        if (expectedDeliveryDate.isAfter(MYSQL_MAX_DATE)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "納期日数が保存可能な範囲を超えています");
+        }
+        return expectedDeliveryDate;
     }
 }

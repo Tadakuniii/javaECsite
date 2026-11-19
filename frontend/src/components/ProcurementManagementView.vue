@@ -37,6 +37,7 @@ onMounted(async () => {
 })
 
 const submitOrder = async () => {
+  if (isSaving.value || receivingOrderId.value !== undefined) return
   errorMessage.value = ''
   successMessage.value = ''
   isSaving.value = true
@@ -53,6 +54,7 @@ const submitOrder = async () => {
 }
 
 const receiveOrder = async (order: PurchaseOrder) => {
+  if (isSaving.value || receivingOrderId.value !== undefined) return
   errorMessage.value = ''
   successMessage.value = ''
   receivingOrderId.value = order.id
@@ -60,13 +62,13 @@ const receiveOrder = async (order: PurchaseOrder) => {
     const received = await receivePurchaseOrder(order.id)
     const orderIndex = orders.value.findIndex(item => item.id === received.id)
     if (orderIndex >= 0) orders.value[orderIndex] = received
-    const product = products.value.find(item => item.id === received.productId)
-    if (product) product.stockQuantity += received.quantity
     successMessage.value = `${received.productName}の入荷を在庫へ反映しました`
     try {
-      orders.value = await getPurchaseOrders()
+      const [latestProducts, latestOrders] = await Promise.all([getManagedProducts(), getPurchaseOrders()])
+      products.value = latestProducts
+      orders.value = latestOrders
     } catch {
-      errorMessage.value = '入荷は反映されましたが、最新の発注履歴を再取得できませんでした'
+      errorMessage.value = '入荷は反映されましたが、最新の商品情報と発注履歴を再取得できませんでした'
     }
   } catch (error: unknown) {
     errorMessage.value = error instanceof Error ? error.message : '入荷を登録できませんでした'
@@ -91,7 +93,7 @@ const receiveOrder = async (order: PurchaseOrder) => {
         <div class="form-group"><label for="delivery-date">納期</label><input id="delivery-date" v-model="form.expectedDeliveryDate" class="input-control" type="date" :min="localDate(new Date())" required /></div>
         <div class="form-group"><label for="unit-cost">単価（円）</label><input id="unit-cost" v-model.number="form.unitCost" class="input-control" type="number" min="0" required /></div>
         <div class="form-group"><label for="order-quantity">発注数</label><input id="order-quantity" v-model.number="form.quantity" class="input-control" type="number" min="1" required /></div>
-        <div class="order-summary wide"><span>発注金額</span><strong>{{ yen.format(estimatedTotal) }}</strong><button type="submit" class="btn" :disabled="isSaving || !products.length">{{ isSaving ? '登録中…' : '発注を登録' }}</button></div>
+        <div class="order-summary wide"><span>発注金額</span><strong>{{ yen.format(estimatedTotal) }}</strong><button type="submit" class="btn" :disabled="isSaving || receivingOrderId !== undefined || !products.length">{{ isSaving ? '登録中…' : '発注を登録' }}</button></div>
       </form>
     </section>
 
@@ -103,7 +105,7 @@ const receiveOrder = async (order: PurchaseOrder) => {
         <article v-for="order in orders" :key="order.id" class="history-card card">
           <header><div><span class="order-number">発注番号 #{{ order.id }}</span><h3>{{ order.productName }}</h3></div><div class="badges"><span v-if="order.automatic" class="auto-badge">自動発注</span><span :class="['status', { received: order.status === 'RECEIVED' }]">{{ order.statusLabel }}</span></div></header>
           <dl><div><dt>発注先</dt><dd>{{ order.supplierName }}</dd></div><div><dt>発注日時</dt><dd>{{ dateTime.format(new Date(order.orderedAt)) }}</dd></div><div><dt>納期</dt><dd>{{ order.expectedDeliveryDate }}</dd></div><div><dt>単価</dt><dd>{{ yen.format(order.unitCost) }}</dd></div><div><dt>発注数</dt><dd>{{ order.quantity }}</dd></div><div><dt>発注金額</dt><dd>{{ yen.format(order.totalCost) }}</dd></div></dl>
-          <button v-if="order.status === 'ORDERED'" type="button" class="receive-button" :disabled="receivingOrderId === order.id" @click="receiveOrder(order)">{{ receivingOrderId === order.id ? '反映中…' : '入荷済みにして在庫へ反映' }}</button>
+          <button v-if="order.status === 'ORDERED'" type="button" class="receive-button" :disabled="isSaving || receivingOrderId !== undefined" @click="receiveOrder(order)">{{ receivingOrderId === order.id ? '反映中…' : '入荷済みにして在庫へ反映' }}</button>
         </article>
       </div>
     </section>

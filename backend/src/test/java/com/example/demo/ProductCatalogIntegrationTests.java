@@ -259,6 +259,17 @@ class ProductCatalogIntegrationTests {
                         .contentType("application/json").content(pastDeliveryDateJson))
                 .andExpect(status().isBadRequest());
 
+        String invalidLeadTimeJson = """
+                {"name":"納期上限テスト商品","category":"食品・飲料","description":"納期上限の検証用です。",
+                 "sizeDescription":"1個","price":100,"stockQuantity":0,"imageUrl":"","active":true,
+                 "autoOrderEnabled":true,"reorderThreshold":1,"reorderQuantity":1,
+                 "defaultSupplierName":"納期テスト商事","defaultOrderUnitCost":50,
+                 "defaultLeadTimeDays":2147483647}
+                """;
+        api.perform(post("/api/admin/products").with(user("admin").roles("ADMIN")).with(csrf())
+                        .contentType("application/json").content(invalidLeadTimeJson))
+                .andExpect(status().isBadRequest());
+
         api.perform(post("/api/cart/items").with(user(customerId)).with(csrf())
                         .contentType("application/json")
                         .content("{\"productId\":" + product.getId() + ",\"quantity\":1}"))
