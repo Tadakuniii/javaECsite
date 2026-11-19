@@ -47,6 +47,24 @@ public class Product {
     @Column(nullable = false)
     private int stockQuantity;
 
+    @Column(nullable = false)
+    private boolean autoOrderEnabled;
+
+    @Column(nullable = false)
+    private int reorderThreshold;
+
+    @Column(nullable = false)
+    private int reorderQuantity = 1;
+
+    @Column(length = 200)
+    private String defaultSupplierName;
+
+    @Column(nullable = false)
+    private int defaultOrderUnitCost;
+
+    @Column(nullable = false)
+    private int defaultLeadTimeDays = 7;
+
     @Column(length = 500)
     private String imageUrl;
 

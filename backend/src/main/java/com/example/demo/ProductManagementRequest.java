@@ -12,5 +12,11 @@ public record ProductManagementRequest(
         @Min(0) int price,
         @Min(0) int stockQuantity,
         @Size(max = 500) String imageUrl,
-        boolean active) {
+        boolean active,
+        boolean autoOrderEnabled,
+        @Min(0) int reorderThreshold,
+        @Min(0) int reorderQuantity,
+        @Size(max = 200) String defaultSupplierName,
+        @Min(0) int defaultOrderUnitCost,
+        @Min(0) int defaultLeadTimeDays) {
 }

@@ -11,7 +11,12 @@ const isLoading = ref(true)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
-const emptyForm = (): ProductInput => ({ name: '', category: 'サプリメント', description: '', sizeDescription: '', price: 0, stockQuantity: 0, imageUrl: '', active: true })
+const emptyForm = (): ProductInput => ({
+  name: '', category: 'サプリメント', description: '', sizeDescription: '', price: 0,
+  stockQuantity: 0, imageUrl: '', active: true, autoOrderEnabled: false,
+  reorderThreshold: 5, reorderQuantity: 10, defaultSupplierName: '',
+  defaultOrderUnitCost: 0, defaultLeadTimeDays: 7,
+})
 const form = reactive<ProductInput>(emptyForm())
 
 onMounted(async () => {
@@ -29,7 +34,14 @@ const resetForm = () => {
 
 const editProduct = (product: ManagedProduct) => {
   editingProductId.value = product.id
-  Object.assign(form, { name: product.name, category: product.category, description: product.description, sizeDescription: product.sizeDescription, price: product.price, stockQuantity: product.stockQuantity, imageUrl: product.imageUrl || '', active: product.active })
+  Object.assign(form, {
+    name: product.name, category: product.category, description: product.description,
+    sizeDescription: product.sizeDescription, price: product.price, stockQuantity: product.stockQuantity,
+    imageUrl: product.imageUrl || '', active: product.active,
+    autoOrderEnabled: product.autoOrderEnabled, reorderThreshold: product.reorderThreshold,
+    reorderQuantity: product.reorderQuantity, defaultSupplierName: product.defaultSupplierName || '',
+    defaultOrderUnitCost: product.defaultOrderUnitCost, defaultLeadTimeDays: product.defaultLeadTimeDays,
+  })
   errorMessage.value = ''
   successMessage.value = ''
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -79,6 +91,16 @@ const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' 
         <div class="form-group"><label for="image-url">画像URL（任意）</label><input id="image-url" v-model.trim="form.imageUrl" class="input-control" type="url" maxlength="500" placeholder="未設定でも登録できます" /></div>
         <div class="form-group wide"><label for="description">説明</label><textarea id="description" v-model.trim="form.description" class="input-control" rows="4" maxlength="2000" required></textarea></div>
         <label class="sale-switch wide"><input v-model="form.active" type="checkbox" /><span><strong>販売する</strong><small>オフにすると商品一覧に表示されません</small></span></label>
+        <fieldset class="auto-order-settings wide">
+          <label class="sale-switch"><input v-model="form.autoOrderEnabled" type="checkbox" /><span><strong>自動発注を有効にする</strong><small>在庫が基準数以下になると発注履歴を自動作成します</small></span></label>
+          <div v-if="form.autoOrderEnabled" class="auto-order-fields">
+            <div class="form-group"><label for="reorder-threshold">発注基準在庫数</label><input id="reorder-threshold" v-model.number="form.reorderThreshold" class="input-control" type="number" min="0" required /></div>
+            <div class="form-group"><label for="reorder-quantity">自動発注数</label><input id="reorder-quantity" v-model.number="form.reorderQuantity" class="input-control" type="number" min="1" required /></div>
+            <div class="form-group"><label for="default-supplier">発注先</label><input id="default-supplier" v-model.trim="form.defaultSupplierName" class="input-control" maxlength="200" required /></div>
+            <div class="form-group"><label for="default-unit-cost">発注単価（円）</label><input id="default-unit-cost" v-model.number="form.defaultOrderUnitCost" class="input-control" type="number" min="0" required /></div>
+            <div class="form-group"><label for="lead-time">納期日数</label><input id="lead-time" v-model.number="form.defaultLeadTimeDays" class="input-control" type="number" min="1" required /></div>
+          </div>
+        </fieldset>
         <div class="form-actions wide"><button type="submit" class="btn" :disabled="isSaving">{{ isSaving ? '保存中…' : editingProductId ? '変更を保存' : '商品を登録' }}</button></div>
       </form>
     </section>
@@ -89,7 +111,7 @@ const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' 
       <div v-else class="product-rows">
         <article v-for="product in products" :key="product.id" class="product-row card">
           <div class="thumbnail"><img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name" /><span v-else>画像なし</span></div>
-          <div class="product-summary"><span class="category">{{ product.category }}</span><h3>{{ product.name }}</h3><p>{{ product.sizeDescription }} · {{ yen.format(product.price) }} · 在庫 {{ product.stockQuantity }}</p></div>
+          <div class="product-summary"><span class="category">{{ product.category }}</span><h3>{{ product.name }}</h3><p>{{ product.sizeDescription }} · {{ yen.format(product.price) }} · 在庫 {{ product.stockQuantity }}</p><small v-if="product.autoOrderEnabled">在庫{{ product.reorderThreshold }}以下で{{ product.reorderQuantity }}点を自動発注</small></div>
           <span :class="['status', { inactive: !product.active }]">{{ product.active ? '販売中' : '販売停止' }}</span>
           <button type="button" class="edit-button" @click="editProduct(product)">編集</button>
         </article>
@@ -106,6 +128,7 @@ const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' 
 .back-button, .text-button, .edit-button { border: 1px solid var(--input-border); background: var(--card-bg); color: var(--primary); border-radius: var(--radius-md); padding: 10px 14px; font: inherit; cursor: pointer; }
 .editor-card { padding: 30px; }.editor-card:hover, .product-row:hover { transform: none; }.editor-heading { margin-bottom: 24px; }.editor-heading h2, .inventory-heading h2 { color: var(--text-primary); text-align: left; margin: 4px 0 0; font-size: 21px; font-weight: 700; }
 .product-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; }.wide { grid-column: 1 / -1; }.form-group textarea { resize: vertical; }.sale-switch { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--input-border); border-radius: var(--radius-md); background: var(--input-bg); cursor: pointer; }.sale-switch input { width: 20px; height: 20px; accent-color: var(--primary); }.sale-switch span { display: flex; flex-direction: column; gap: 2px; }.sale-switch small { color: var(--text-secondary); }.form-actions { display: flex; justify-content: flex-end; margin-top: 22px; }.form-actions .btn { width: min(260px, 100%); }
+.auto-order-settings { margin: 18px 0 0; padding: 0; border: 0; }.auto-order-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; padding: 18px 16px 0; border: 1px solid var(--input-border); border-top: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); }.auto-order-settings:has(.auto-order-fields) .sale-switch { border-radius: var(--radius-md) var(--radius-md) 0 0; }.product-summary small { display: block; margin-top: 5px; color: var(--primary); font-size: 10px; }
 .inventory { margin-top: 36px; }.inventory-heading { margin-bottom: 16px; }.inventory-heading > span { color: var(--text-secondary); font-size: 13px; }.product-rows { display: grid; gap: 12px; }.product-row { padding: 16px 18px; }.thumbnail { width: 72px; height: 64px; flex: 0 0 72px; display: grid; place-items: center; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 10px; color: var(--text-secondary); font-size: 10px; }.thumbnail img { width: 100%; height: 100%; object-fit: contain; border-radius: 10px; }.product-summary { flex: 1; min-width: 0; }.product-summary h3 { margin: 3px 0; font-size: 16px; }.product-summary p, .category { color: var(--text-secondary); font-size: 11px; }.category { color: var(--primary); }.status { color: var(--success); background: var(--success-bg); border-radius: 20px; padding: 6px 10px; font-size: 11px; white-space: nowrap; }.status.inactive { color: var(--text-secondary); background: var(--input-bg); }.edit-button { min-width: 72px; }
-@media (max-width: 650px) { .management-header { align-items: flex-start; flex-direction: column; }.product-form { grid-template-columns: 1fr; }.wide { grid-column: auto; }.editor-card { padding: 24px 20px; }.product-row { flex-wrap: wrap; }.product-summary { min-width: calc(100% - 100px); }.status { margin-left: 92px; }.edit-button { flex: 1; }.editor-heading { align-items: flex-start; } }
+@media (max-width: 650px) { .management-header { align-items: flex-start; flex-direction: column; }.product-form, .auto-order-fields { grid-template-columns: 1fr; }.wide { grid-column: auto; }.editor-card { padding: 24px 20px; }.product-row { flex-wrap: wrap; }.product-summary { min-width: calc(100% - 100px); }.status { margin-left: 92px; }.edit-button { flex: 1; }.editor-heading { align-items: flex-start; } }
 </style>

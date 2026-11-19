@@ -11,10 +11,18 @@ export interface ManagedProduct {
   stockQuantity: number
   imageUrl?: string
   active: boolean
+  autoOrderEnabled: boolean
+  reorderThreshold: number
+  reorderQuantity: number
+  defaultSupplierName?: string
+  defaultOrderUnitCost: number
+  defaultLeadTimeDays: number
 }
 
 export type ProductInput = Pick<ManagedProduct,
-  'name' | 'category' | 'description' | 'sizeDescription' | 'price' | 'stockQuantity' | 'imageUrl' | 'active'>
+  'name' | 'category' | 'description' | 'sizeDescription' | 'price' | 'stockQuantity' | 'imageUrl' | 'active'
+  | 'autoOrderEnabled' | 'reorderThreshold' | 'reorderQuantity' | 'defaultSupplierName'
+  | 'defaultOrderUnitCost' | 'defaultLeadTimeDays'>
 
 async function getCsrfHeader(): Promise<Record<string, string>> {
   const response = await fetch('/api/csrf', { credentials: 'same-origin' })
