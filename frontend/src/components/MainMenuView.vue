@@ -10,6 +10,7 @@ defineProps<{ username: string; administrator: boolean }>()
 const emit = defineEmits<{
   (e: 'logout-success'): void
   (e: 'open-product-management'): void
+  (e: 'open-procurement-management'): void
   (e: 'open-order-history', purchased: boolean): void
 }>()
 const categories: ('すべて' | ProductCategory)[] = ['すべて', 'サプリメント', '食品・飲料', '健康グッズ']
@@ -175,6 +176,9 @@ const handleLogout = async () => {
         <button type="button" class="logout-button" @click="emit('open-order-history', false)">注文履歴</button>
         <button v-if="administrator" type="button" class="logout-button" @click="emit('open-product-management')">
           商品管理
+        </button>
+        <button v-if="administrator" type="button" class="logout-button" @click="emit('open-procurement-management')">
+          発注管理
         </button>
         <button type="button" class="logout-button" :disabled="isLoggingOut" @click="handleLogout">
           {{ isLoggingOut ? 'ログアウト中…' : 'ログアウト' }}

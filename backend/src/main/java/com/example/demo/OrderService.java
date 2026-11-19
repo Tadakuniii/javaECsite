@@ -15,16 +15,19 @@ public class OrderService {
     private final CartItemRepository cartItems;
     private final CustomerRepository customers;
     private final ProductRepository products;
+    private final ProcurementService procurement;
 
     public OrderService(CustomerOrderRepository orders, OrderItemRepository orderItems,
                         ShoppingCartRepository carts, CartItemRepository cartItems,
-                        CustomerRepository customers, ProductRepository products) {
+                        CustomerRepository customers, ProductRepository products,
+                        ProcurementService procurement) {
         this.orders = orders;
         this.orderItems = orderItems;
         this.carts = carts;
         this.cartItems = cartItems;
         this.customers = customers;
         this.products = products;
+        this.procurement = procurement;
     }
 
     @Transactional(readOnly = true)
@@ -72,6 +75,7 @@ public class OrderService {
             return new OrderItem(order, product, item.getQuantity());
         }).toList();
         products.saveAll(currentItems.stream().map(CartItem::getProduct).toList());
+        currentItems.stream().map(CartItem::getProduct).forEach(procurement::createAutomaticOrderIfNeeded);
         orderItems.saveAll(purchasedItems);
         cartItems.deleteAll(currentItems);
         cartItems.flush();

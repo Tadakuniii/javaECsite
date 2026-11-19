@@ -11,10 +11,13 @@ import org.springframework.web.server.ResponseStatusException;
 public class ProductManagementService {
     private final ProductRepository products;
     private final ProductCategoryRepository categories;
+    private final ProcurementService procurement;
 
-    public ProductManagementService(ProductRepository products, ProductCategoryRepository categories) {
+    public ProductManagementService(ProductRepository products, ProductCategoryRepository categories,
+                                    ProcurementService procurement) {
         this.products = products;
         this.categories = categories;
+        this.procurement = procurement;
     }
 
     /** 管理画面の入力から商品を新規登録する。 */
@@ -26,7 +29,9 @@ public class ProductManagementService {
                 request.price(), request.stockQuantity(), request.sizeDescription().strip(), request.name().strip(),
                 "#7881b9", "bottle");
         applyEditableValues(product, request);
-        return ManagedProductResponse.from(products.save(product));
+        Product saved = products.save(product);
+        procurement.createAutomaticOrderIfNeeded(saved);
+        return ManagedProductResponse.from(saved);
     }
 
     /** 指定された既存商品の編集可能項目を更新する。 */
@@ -36,7 +41,9 @@ public class ProductManagementService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
         product.setCategory(findCategory(request.category()));
         applyEditableValues(product, request);
-        return ManagedProductResponse.from(products.save(product));
+        Product saved = products.save(product);
+        procurement.createAutomaticOrderIfNeeded(saved);
+        return ManagedProductResponse.from(saved);
     }
 
     private ProductCategory findCategory(String categoryName) {
@@ -52,6 +59,14 @@ public class ProductManagementService {
         product.setStockQuantity(request.stockQuantity());
         product.setImageUrl(request.imageUrl() == null || request.imageUrl().isBlank() ? null : request.imageUrl().strip());
         product.setActive(request.active());
+        product.setAutoOrderEnabled(request.autoOrderEnabled());
+        product.setReorderThreshold(request.reorderThreshold());
+        product.setReorderQuantity(request.reorderQuantity());
+        product.setDefaultSupplierName(request.defaultSupplierName() == null || request.defaultSupplierName().isBlank()
+                ? null : request.defaultSupplierName().strip());
+        product.setDefaultOrderUnitCost(request.defaultOrderUnitCost());
+        product.setDefaultLeadTimeDays(request.defaultLeadTimeDays());
+        procurement.validateAutomaticOrderSettings(product);
     }
 
     private String createUniqueProductCode(String productName) {

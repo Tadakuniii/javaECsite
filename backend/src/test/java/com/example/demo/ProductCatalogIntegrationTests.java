@@ -2,6 +2,7 @@ package com.example.demo;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +44,7 @@ class ProductCatalogIntegrationTests {
     @Autowired CartItemRepository cartItems;
     @Autowired CustomerOrderRepository orders;
     @Autowired OrderItemRepository orderItems;
+    @Autowired PurchaseOrderRepository purchaseOrders;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired ProductCatalogInitializer catalogInitializer;
     @Autowired ShoppingCartService shoppingCartService;
@@ -107,7 +109,9 @@ class ProductCatalogIntegrationTests {
     void productManagementRequiresAdministratorAndCanCreateAndUpdateProducts() throws Exception {
         String productJson = """
                 {"name":"テスト青汁","category":"食品・飲料","description":"国産野菜の青汁です。",
-                 "sizeDescription":"30包","price":1200,"stockQuantity":25,"imageUrl":"","active":true}
+                 "sizeDescription":"30包","price":1200,"stockQuantity":25,"imageUrl":"","active":true,
+                 "autoOrderEnabled":false,"reorderThreshold":0,"reorderQuantity":1,"defaultSupplierName":"",
+                 "defaultOrderUnitCost":0,"defaultLeadTimeDays":7}
                 """;
         api.perform(get("/api/admin/products").with(user("customer").roles("CUSTOMER")))
                 .andExpect(status().isForbidden());
@@ -122,7 +126,9 @@ class ProductCatalogIntegrationTests {
         Product created = products.findAllByOrderById().getLast();
         String updateJson = """
                 {"name":"テスト青汁 改良版","category":"食品・飲料","description":"説明を更新しました。",
-                 "sizeDescription":"45包","price":1350,"stockQuantity":10,"imageUrl":"https://example.com/aojiru.png","active":false}
+                 "sizeDescription":"45包","price":1350,"stockQuantity":10,"imageUrl":"https://example.com/aojiru.png","active":false,
+                 "autoOrderEnabled":false,"reorderThreshold":0,"reorderQuantity":1,"defaultSupplierName":"",
+                 "defaultOrderUnitCost":0,"defaultLeadTimeDays":7}
                 """;
         api.perform(put("/api/admin/products/{id}", created.getId())
                         .with(user("admin").roles("ADMIN")).with(csrf())
@@ -213,6 +219,74 @@ class ProductCatalogIntegrationTests {
         api.perform(post("/api/orders").with(user(customerId)).with(csrf()))
                 .andExpect(status().isBadRequest());
         assertThat(orders.findAllByCustomerCustomerIdOrderByOrderedAtDesc(customerId)).hasSize(1);
+    }
+
+    /** 手動発注と、在庫減少による自動発注、入荷時の在庫反映を検証する。 */
+    @Test
+    void procurementCreatesManualAndAutomaticOrdersAndReceivesStock() throws Exception {
+        String customerId = "procurement-customer";
+        customers.save(new Customer(customerId, passwordEncoder.encode("password123"), "発注テスト利用者"));
+        Product product = products.findAllByActiveTrueOrderById().getLast();
+        Product manuallyOrderedProduct = products.findAllByActiveTrueOrderById().getFirst();
+        int stockBeforePurchase = product.getStockQuantity();
+        product.setAutoOrderEnabled(true);
+        product.setReorderThreshold(stockBeforePurchase - 1);
+        product.setReorderQuantity(8);
+        product.setDefaultSupplierName("自動発注テスト商事");
+        product.setDefaultOrderUnitCost(450);
+        product.setDefaultLeadTimeDays(3);
+        products.saveAndFlush(product);
+
+        String manualOrderJson = """
+                {"productId":%d,"supplierName":"手動発注テスト商事","expectedDeliveryDate":"%s",
+                 "unitCost":500,"quantity":4}
+                """.formatted(manuallyOrderedProduct.getId(), java.time.LocalDate.now().plusDays(2));
+        api.perform(post("/api/admin/procurements").with(user("customer").roles("CUSTOMER")).with(csrf())
+                        .contentType("application/json").content(manualOrderJson))
+                .andExpect(status().isForbidden());
+        api.perform(post("/api/admin/procurements").with(user("admin").roles("ADMIN")).with(csrf())
+                        .contentType("application/json").content(manualOrderJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.supplierName").value("手動発注テスト商事"))
+                .andExpect(jsonPath("$.quantity").value(4))
+                .andExpect(jsonPath("$.automatic").value(false));
+
+        api.perform(post("/api/cart/items").with(user(customerId)).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"productId\":" + product.getId() + ",\"quantity\":1}"))
+                .andExpect(status().isOk());
+        api.perform(post("/api/orders").with(user(customerId)).with(csrf()))
+                .andExpect(status().isOk());
+
+        List<PurchaseOrder> automaticOrders = purchaseOrders.findAllByOrderByOrderedAtDesc().stream()
+                .filter(order -> order.getProduct().getId().equals(product.getId()) && order.isAutomatic())
+                .toList();
+        assertThat(automaticOrders).singleElement().satisfies(order -> {
+            assertThat(order.getSupplierName()).isEqualTo("自動発注テスト商事");
+            assertThat(order.getQuantity()).isEqualTo(8);
+            assertThat(order.getUnitCost()).isEqualTo(450);
+        });
+
+        api.perform(post("/api/cart/items").with(user(customerId)).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"productId\":" + product.getId() + ",\"quantity\":1}"))
+                .andExpect(status().isOk());
+        api.perform(post("/api/orders").with(user(customerId)).with(csrf()))
+                .andExpect(status().isOk());
+        assertThat(purchaseOrders.findAllByOrderByOrderedAtDesc().stream()
+                .filter(order -> order.getProduct().getId().equals(product.getId()) && order.isAutomatic()))
+                .hasSize(1);
+
+        PurchaseOrder automaticOrder = automaticOrders.getFirst();
+        api.perform(post("/api/admin/procurements/{id}/receive", automaticOrder.getId())
+                        .with(user("admin").roles("ADMIN")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RECEIVED"));
+        assertThat(products.findById(product.getId()).orElseThrow().getStockQuantity())
+                .isEqualTo(stockBeforePurchase - 2 + 8);
+        api.perform(get("/api/admin/procurements").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("自動発注テスト商事")));
     }
 
     /** 初回カゴ作成と同じ商品の追加が同時でも、1つのカゴへ数量が加算されることを検証する。 */

@@ -7,8 +7,9 @@ import MainMenuView from './components/MainMenuView.vue'
 import ProductManagementView from './components/ProductManagementView.vue'
 import RegisterSuccessView from './components/RegisterSuccessView.vue'
 import OrderHistoryView from './components/OrderHistoryView.vue'
+import ProcurementManagementView from './components/ProcurementManagementView.vue'
 
-type ViewState = 'login' | 'register' | 'main-menu' | 'product-management' | 'order-history' | 'register-success'
+type ViewState = 'login' | 'register' | 'main-menu' | 'product-management' | 'procurement-management' | 'order-history' | 'register-success'
 
 const currentView = ref<ViewState>('login')
 const loggedInUser = ref('')
@@ -53,7 +54,7 @@ const openOrderHistory = (purchased: boolean) => {
 </script>
 
 <template>
-  <main id="app-container" :class="{ 'wide-layout': currentView === 'main-menu' || currentView === 'product-management' || currentView === 'order-history' }">
+  <main id="app-container" :class="{ 'wide-layout': currentView === 'main-menu' || currentView === 'product-management' || currentView === 'procurement-management' || currentView === 'order-history' }">
     <p v-if="isRestoringSession" role="status">ログイン状態を確認中…</p>
     <template v-else>
       <div v-if="sessionError" class="alert alert-danger">{{ sessionError }}</div>
@@ -72,12 +73,18 @@ const openOrderHistory = (purchased: boolean) => {
           :username="loggedInUser"
           :administrator="isAdministrator"
           @open-product-management="currentView = 'product-management'"
+          @open-procurement-management="currentView = 'procurement-management'"
           @open-order-history="openOrderHistory"
           @logout-success="onLogoutSuccess"
         />
         <ProductManagementView
           v-else-if="currentView === 'product-management' && isAdministrator"
           @back="currentView = 'main-menu'"
+        />
+        <ProcurementManagementView
+          v-else-if="currentView === 'procurement-management' && isAdministrator"
+          @back="currentView = 'main-menu'"
+          @open-products="currentView = 'product-management'"
         />
         <div v-else-if="currentView === 'order-history'" class="order-history-wrapper">
           <div v-if="purchaseCompleted" class="alert purchase-complete" role="status">購入が完了しました。ご注文ありがとうございます。</div>
