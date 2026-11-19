@@ -259,6 +259,14 @@ class ProductCatalogIntegrationTests {
                         .contentType("application/json").content(pastDeliveryDateJson))
                 .andExpect(status().isBadRequest());
 
+        String outOfRangeDeliveryDateJson = """
+                {"productId":%d,"supplierName":"日付上限テスト商事","expectedDeliveryDate":"+10000-01-01",
+                 "unitCost":500,"quantity":4}
+                """.formatted(manuallyOrderedProduct.getId());
+        api.perform(post("/api/admin/procurements").with(user("admin").roles("ADMIN")).with(csrf())
+                        .contentType("application/json").content(outOfRangeDeliveryDateJson))
+                .andExpect(status().isBadRequest());
+
         String invalidLeadTimeJson = """
                 {"name":"納期上限テスト商品","category":"食品・飲料","description":"納期上限の検証用です。",
                  "sizeDescription":"1個","price":100,"stockQuantity":0,"imageUrl":"","active":true,

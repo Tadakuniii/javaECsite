@@ -11,6 +11,10 @@ import org.springframework.data.repository.query.Param;
 public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Long> {
     List<PurchaseOrder> findAllByOrderByOrderedAtDesc();
 
+    @Query("select purchaseOrder.product.id from PurchaseOrder purchaseOrder "
+            + "where purchaseOrder.id = :purchaseOrderId")
+    Optional<Long> findProductIdById(@Param("purchaseOrderId") Long purchaseOrderId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select purchaseOrder from PurchaseOrder purchaseOrder "
             + "where purchaseOrder.product.id = :productId and purchaseOrder.status = :status")

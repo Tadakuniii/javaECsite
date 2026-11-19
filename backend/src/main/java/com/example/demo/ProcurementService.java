@@ -32,9 +32,7 @@ public class ProcurementService {
     public PurchaseOrderResponse createManualOrder(PurchaseOrderRequest request) {
         Product product = products.findByIdForOrder(request.productId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
-        if (request.expectedDeliveryDate().isBefore(LocalDate.now(clock))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "納期は今日以降の日付を指定してください");
-        }
+        validateManualDeliveryDate(request.expectedDeliveryDate());
         PurchaseOrder order = new PurchaseOrder(product, request.supplierName().strip(),
                 request.expectedDeliveryDate(), request.unitCost(), request.quantity(), false,
                 LocalDateTime.now(clock));
@@ -58,13 +56,15 @@ public class ProcurementService {
 
     @Transactional
     public PurchaseOrderResponse receive(long purchaseOrderId) {
+        Long productId = purchaseOrders.findProductIdById(purchaseOrderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "発注履歴が見つかりません"));
+        Product product = products.findByIdForOrder(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
         PurchaseOrder order = purchaseOrders.findByIdForUpdate(purchaseOrderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "発注履歴が見つかりません"));
         if (order.getStatus() == PurchaseOrderStatus.RECEIVED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "すでに入荷済みです");
         }
-        Product product = products.findByIdForOrder(order.getProduct().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品が見つかりません"));
         product.setStockQuantity(Math.addExact(product.getStockQuantity(), order.getQuantity()));
         order.setStatus(PurchaseOrderStatus.RECEIVED);
         order.setReceivedAt(LocalDateTime.now(clock));
@@ -91,5 +91,14 @@ public class ProcurementService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "納期日数が保存可能な範囲を超えています");
         }
         return expectedDeliveryDate;
+    }
+
+    private void validateManualDeliveryDate(LocalDate expectedDeliveryDate) {
+        if (expectedDeliveryDate.isBefore(LocalDate.now(clock))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "納期は今日以降の日付を指定してください");
+        }
+        if (expectedDeliveryDate.isAfter(MYSQL_MAX_DATE)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "納期は9999年12月31日以前の日付を指定してください");
+        }
     }
 }
