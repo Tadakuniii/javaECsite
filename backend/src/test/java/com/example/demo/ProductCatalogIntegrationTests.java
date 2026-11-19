@@ -177,6 +177,44 @@ class ProductCatalogIntegrationTests {
                 .andExpect(jsonPath("$.totalQuantity").value(0));
     }
 
+    /** 購入時に注文と明細を保存し、在庫とカゴを同時に更新することを検証する。 */
+    @Test
+    void checkoutCreatesOrderHistoryReducesStockAndClearsCart() throws Exception {
+        String customerId = "order-customer";
+        customers.save(new Customer(customerId, passwordEncoder.encode("password123"), "注文利用者"));
+        Product product = products.findAllByActiveTrueOrderById().getFirst();
+        int stockBeforePurchase = product.getStockQuantity();
+        int priceAtPurchase = product.getPrice();
+
+        api.perform(post("/api/cart/items").with(user(customerId)).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"productId\":" + product.getId() + ",\"quantity\":2}"))
+                .andExpect(status().isOk());
+
+        api.perform(post("/api/orders").with(user(customerId)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAID"))
+                .andExpect(jsonPath("$.statusLabel").value("購入済み"))
+                .andExpect(jsonPath("$.totalAmount").value(priceAtPurchase * 2))
+                .andExpect(jsonPath("$.items[0].productName").value(product.getName()))
+                .andExpect(jsonPath("$.items[0].quantity").value(2));
+
+        ShoppingCart cart = carts.findByCustomerCustomerId(customerId).orElseThrow();
+        assertThat(cartItems.findAllByCartIdOrderById(cart.getId())).isEmpty();
+        assertThat(products.findById(product.getId()).orElseThrow().getStockQuantity())
+                .isEqualTo(stockBeforePurchase - 2);
+        assertThat(orders.findAllByCustomerCustomerIdOrderByOrderedAtDesc(customerId)).hasSize(1);
+
+        api.perform(get("/api/orders").with(user(customerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].items[0].unitPrice").value(priceAtPurchase));
+        api.perform(get("/api/orders").with(user("other-customer")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        api.perform(post("/api/orders").with(user(customerId)).with(csrf()))
+                .andExpect(status().isBadRequest());
+        assertThat(orders.findAllByCustomerCustomerIdOrderByOrderedAtDesc(customerId)).hasSize(1);
+    }
+
     /** 初回カゴ作成と同じ商品の追加が同時でも、1つのカゴへ数量が加算されることを検証する。 */
     @Test
     void concurrentAddsCreateOneCartWithoutLosingQuantity() throws Exception {
@@ -230,17 +268,20 @@ class ProductCatalogIntegrationTests {
         CustomerOrder order = orders.save(new CustomerOrder(customer, product.getPrice() * 2));
         OrderItem orderItem = orderItems.save(new OrderItem(order, product, 2));
         String orderedProductName = orderItem.getProductName();
+        String orderedSizeDescription = orderItem.getSizeDescription();
         int orderedUnitPrice = orderItem.getUnitPrice();
 
         product.setName("変更後の商品名");
+        product.setSizeDescription("変更後の内容量");
         product.setPrice(product.getPrice() + 500);
         products.save(product);
         entityManager.flush();
         entityManager.detach(orderItem);
 
         assertThat(orderItems.findAllByOrderId(order.getId()).getFirst())
-                .extracting(OrderItem::getProductName, OrderItem::getUnitPrice, OrderItem::getQuantity)
-                .containsExactly(orderedProductName, orderedUnitPrice, 2);
+                .extracting(OrderItem::getProductName, OrderItem::getSizeDescription,
+                        OrderItem::getUnitPrice, OrderItem::getQuantity)
+                .containsExactly(orderedProductName, orderedSizeDescription, orderedUnitPrice, 2);
         assertThat(orders.findAllByCustomerCustomerIdOrderByOrderedAtDesc(customer.getCustomerId()))
                 .containsExactly(order);
     }
